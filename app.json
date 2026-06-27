@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "PocketDev",
+    "slug": "pocketdev",
+    "scheme": "pocketdev",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0e1116"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
+}

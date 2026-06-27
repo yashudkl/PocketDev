@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="Git Screen Placeholder">
+  <rect width="900" height="600" fill="#0b0f14"/>
+  <rect x="40" y="40" width="820" height="520" rx="28" fill="#131923" stroke="#273244" stroke-width="2"/>
+  <rect x="100" y="100" width="700" height="110" rx="18" fill="#171f2b"/>
+  <rect x="100" y="232" width="220" height="56" rx="999" fill="#171f2b"/>
+  <rect x="340" y="232" width="220" height="56" rx="999" fill="#4ea1ff"/>
+  <rect x="580" y="232" width="220" height="56" rx="999" fill="#171f2b"/>
+  <rect x="100" y="312" width="700" height="68" rx="18" fill="#10151c" stroke="#273244"/>
+  <rect x="100" y="394" width="700" height="68" rx="18" fill="#10151c" stroke="#273244"/>
+</svg>

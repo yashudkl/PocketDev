@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="Projects Screen Placeholder">
+  <rect width="900" height="600" fill="#0b0f14"/>
+  <rect x="40" y="40" width="820" height="520" rx="28" fill="#131923" stroke="#273244" stroke-width="2"/>
+  <rect x="100" y="105" width="700" height="58" rx="999" fill="#10151c" stroke="#273244"/>
+  <rect x="100" y="185" width="700" height="96" rx="18" fill="#171f2b"/>
+  <rect x="100" y="301" width="700" height="96" rx="18" fill="#171f2b"/>
+  <rect x="100" y="417" width="700" height="96" rx="18" fill="#171f2b"/>
+</svg>

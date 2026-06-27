@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="File Explorer Screen Placeholder">
+  <rect width="900" height="600" fill="#0b0f14"/>
+  <rect x="40" y="40" width="820" height="520" rx="28" fill="#131923" stroke="#273244" stroke-width="2"/>
+  <rect x="100" y="110" width="700" height="84" rx="16" fill="#10151c" stroke="#273244"/>
+  <rect x="120" y="216" width="650" height="58" rx="14" fill="#171f2b"/>
+  <rect x="150" y="286" width="620" height="58" rx="14" fill="#171f2b"/>
+  <rect x="150" y="356" width="620" height="58" rx="14" fill="#171f2b"/>
+  <rect x="120" y="426" width="650" height="58" rx="14" fill="#171f2b"/>
+</svg>
