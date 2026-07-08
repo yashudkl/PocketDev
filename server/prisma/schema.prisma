@@ -1,0 +1,155 @@
+// PocketDev — Prisma schema
+// Relational core per the build plan: users → projects → jobs → sessions,
+// plus billing/tiers. File manifests live in a JSONB column (Postgres `Json`).
+// Decision 1 of the build plan: PostgreSQL + Prisma.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Tier {
+  FREE
+  PAID
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum ExecutionTarget {
+  CLOUD
+  DESKTOP
+}
+
+enum SessionStatus {
+  ACTIVE
+  CLOSED
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  tier         Tier     @default(FREE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projects        Project[]
+  jobs            Job[]
+  sessions        Session[]
+  subscription    Subscription?
+  desktopPresence DesktopPresence?
+
+  @@map("users")
+}
+
+model Project {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  slug         String
+  description  String?
+  // File manifest / sync-delta metadata — JSONB (Decision 1: the ~20% document-shaped part).
+  manifest     Json?
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs     Job[]
+  sessions Session[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@map("projects")
+}
+
+model Job {
+  id         String          @id @default(cuid())
+  projectId  String
+  userId     String
+  command    String
+  status     JobStatus       @default(QUEUED)
+  target     ExecutionTarget @default(CLOUD)
+  // BullMQ job id assigned by the queue (Decision 2: main app is the queue producer).
+  queueJobId String?
+  exitCode   Int?
+  createdAt  DateTime        @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session?
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@map("jobs")
+}
+
+model Session {
+  id          String          @id @default(cuid())
+  jobId       String?         @unique
+  projectId   String
+  userId      String
+  target      ExecutionTarget @default(CLOUD)
+  status      SessionStatus   @default(ACTIVE)
+  containerId String?
+  startedAt   DateTime        @default(now())
+  endedAt     DateTime?
+
+  job     Job?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Subscription {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  tier           Tier     @default(FREE)
+  status         String   @default("active")
+  quotaJobsPerDay Int     @default(50)
+  jobsUsedToday  Int      @default(0)
+  quotaResetAt   DateTime @default(now())
+  renewsAt       DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// Local-desktop-as-runtime presence (Decision 4). The desktop agent heartbeats
+// to the API; routing sends execution to the desktop tunnel when online.
+model DesktopPresence {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  online        Boolean  @default(false)
+  tunnelUrl     String?
+  lastHeartbeat DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("desktop_presence")
+}

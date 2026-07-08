@@ -1,0 +1,33 @@
+# Local dev dependencies for PocketDev (Build Plan: run Postgres + Redis as containers).
+# Usage:  docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pocketdev-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pocketdev
+      POSTGRES_DB: pocketdev
+    ports:
+      - '5432:5432'
+    volumes:
+      - pocketdev-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pocketdev-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - pocketdev-redis-data:/data
+
+volumes:
+  pocketdev-pg-data:
+  pocketdev-redis-data:

@@ -1,6 +1,54 @@
-node_modules
-.expo
-.expo-shared
-dist
-web-build
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+*.orig.*
+web-build/
+android/
+ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Prisma
+server/prisma/*.db
+server/prisma/*.db-journal
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
 *.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+.history/
+
+# Runtime / local data
+*.pem
+coverage/
+tmp/
+temp/
