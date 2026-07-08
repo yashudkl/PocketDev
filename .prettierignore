@@ -1,0 +1,8 @@
+node_modules
+dist
+build
+.turbo
+.expo
+pnpm-lock.yaml
+*.md
+server/prisma/migrations

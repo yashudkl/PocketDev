@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="Profile Screen Placeholder">
-  <rect width="900" height="600" fill="#0b0f14"/>
-  <rect x="40" y="40" width="820" height="520" rx="28" fill="#131923" stroke="#273244" stroke-width="2"/>
-  <circle cx="450" cy="165" r="56" fill="#1b4f8a"/>
-  <rect x="170" y="250" width="560" height="72" rx="18" fill="#171f2b"/>
-  <rect x="170" y="336" width="560" height="72" rx="18" fill="#171f2b"/>
-  <rect x="170" y="422" width="560" height="72" rx="18" fill="#171f2b"/>
-</svg>

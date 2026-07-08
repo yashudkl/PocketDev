@@ -1,32 +1,39 @@
 {
   "name": "pocketdev",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+  "description": "PocketDev — a mobile-native cloud development environment. Sync your local codebase, then browse, edit, run, and commit from your phone in a real terminal.",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=20"
   },
-  "dependencies": {
-    "@expo/vector-icons": "^15.0.2",
-    "@react-navigation/bottom-tabs": "7.3.10",
-    "@react-navigation/native": "7.3.4",
-    "@react-navigation/native-stack": "7.4.0",
-    "expo": "^56.0.12",
-    "expo-font": "~56.0.7",
-    "expo-status-bar": "~56.0.4",
-    "react": "19.2.3",
-    "react-native": "0.85.3",
-    "react-native-gesture-handler": "~2.31.1",
-    "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "4.25.2"
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rimraf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "server:dev": "pnpm --filter @pocketdev/server start:dev",
+    "mobile:dev": "pnpm --filter mobile dev",
+    "worker:dev": "pnpm --filter @pocketdev/execution-worker dev",
+    "db:generate": "pnpm --filter @pocketdev/server db:generate",
+    "db:migrate": "pnpm --filter @pocketdev/server db:migrate"
   },
   "devDependencies": {
-    "@types/react": "~19.2.14",
-    "babel-preset-expo": "~56.0.15",
-    "metro-config": "^0.84.4",
-    "typescript": "~6.0.3"
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "turbo": "^2.3.3",
+    "typescript": "~5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild"
+    ]
   }
 }

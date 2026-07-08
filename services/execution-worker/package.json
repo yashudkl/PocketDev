@@ -1,0 +1,30 @@
+{
+  "name": "@pocketdev/execution-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PocketDev execution engine — the ONE split-out process (Decision 2). BullMQ consumer that spawns hardened Docker containers + node-pty and streams a real terminal over WebSocket.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"(lint: skipped for execution-worker scaffold)\"",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@pocketdev/shared": "workspace:*",
+    "bullmq": "^5.34.6",
+    "dockerode": "^4.0.2",
+    "ioredis": "^5.4.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.31",
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.13",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "~5.9.2"
+  }
+}
