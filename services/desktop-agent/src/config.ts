@@ -14,6 +14,10 @@ function defaultShell(): string {
 
 export const config = {
   port: num(process.env.DESKTOP_AGENT_PORT, 4000),
+  // Bind loopback by default: cloudflared connects to localhost, so the tunnel
+  // still works, but nothing on the LAN can reach the (unsandboxed) host PTY.
+  // Set DESKTOP_BIND=0.0.0.0 only if you deliberately expose it another way.
+  bindHost: process.env.DESKTOP_BIND ?? '127.0.0.1',
   apiUrl: process.env.POCKETDEV_API_URL ?? 'http://localhost:3000',
   /** The desktop's own linking token (its user's JWT) for presence + closing sessions. */
   token: process.env.POCKETDEV_TOKEN ?? '',

@@ -68,16 +68,19 @@ const worker = new Worker<RunCommandJobData, RunCommandJobResult>(
 
     const exitCode = await new Promise<number>((resolve) => {
       let settled = false;
+      let connectTimer: NodeJS.Timeout;
+      let maxTimer: NodeJS.Timeout;
       const done = (code: number): void => {
-        if (!settled) {
-          settled = true;
-          resolve(code);
-        }
+        if (settled) return;
+        settled = true;
+        clearTimeout(connectTimer);
+        clearTimeout(maxTimer);
+        resolve(code);
       };
       // No phone attached in time → nothing ran, release the slot.
-      const connectTimer = setTimeout(() => done(0), config.connectTimeoutS * 1000);
+      connectTimer = setTimeout(() => done(0), config.connectTimeoutS * 1000);
       // Hard wall-clock cap (124 = timeout, like coreutils `timeout`).
-      const maxTimer = setTimeout(() => done(124), config.maxDurationS * 1000);
+      maxTimer = setTimeout(() => done(124), config.maxDurationS * 1000);
 
       registry.set({
         sessionId,
@@ -87,11 +90,7 @@ const worker = new Worker<RunCommandJobData, RunCommandJobResult>(
         containerId: container.id,
         container,
         attached: () => clearTimeout(connectTimer),
-        release: (code) => {
-          clearTimeout(connectTimer);
-          clearTimeout(maxTimer);
-          done(code);
-        },
+        release: (code) => done(code),
       });
     });
 

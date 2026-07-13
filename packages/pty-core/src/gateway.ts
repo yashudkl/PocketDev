@@ -93,7 +93,10 @@ function handleConnection(
     void onMessage(conn, msg, opts, log);
   });
 
-  ws.on('close', () => finish(conn, opts, -1));
+  // A client disconnecting (closing the terminal) is a NORMAL end, not a failure
+  // — report 0 so the reconciler records SUCCEEDED. A real process exit still
+  // reports its own code via handle.onExit before this fires.
+  ws.on('close', () => finish(conn, opts, 0));
   ws.on('error', (err) => log(`pty socket error: ${err.message}`));
 }
 
@@ -161,7 +164,10 @@ async function onStart(
       sessionId: ctx.sessionId,
       message: (err as Error).message,
     });
-    conn.exited = true;
+    // Go through finish() so onSessionExit fires — otherwise the worker's job
+    // (already past attached(), connect-timer cleared) blocks until max-duration,
+    // leaking the container + concurrency slot.
+    finish(conn, opts, 1);
     conn.ws.close(1011, 'spawn failed');
     return;
   }

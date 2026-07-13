@@ -1,5 +1,22 @@
 import { createPtyGateway, jwtVerifier } from '@pocketdev/pty-core';
+import jwt from 'jsonwebtoken';
 import { config, shellArgs } from './config';
+
+// The desktop's own linked owner (from its access token). A PTY session runs an
+// UNSANDBOXED shell on this host, so we must bind it to this owner: only a PTY
+// token minted for THIS user is allowed to spawn here. Without this, any user's
+// own valid token (all share JWT_SECRET) could open a shell on someone else's
+// machine. An unlinked desktop (no token) authorizes no one.
+function resolveOwnerId(): string | null {
+  if (!config.token) return null;
+  try {
+    const decoded = jwt.verify(config.token, config.jwtSecret) as { sub?: string };
+    return typeof decoded.sub === 'string' ? decoded.sub : null;
+  } catch {
+    return null;
+  }
+}
+const OWNER_ID = resolveOwnerId();
 
 // ── PTY gateway ──────────────────────────────────────────────────────────────
 // The SAME PTY-over-WS server the cloud worker runs (via @pocketdev/pty-core),
@@ -9,14 +26,20 @@ import { config, shellArgs } from './config';
 // same API-minted PTY token (verified here with the shared JWT secret).
 const gateway = createPtyGateway({
   port: config.port,
+  host: config.bindHost,
   verify: jwtVerifier(config.jwtSecret),
   logger: (msg) => console.log(`[desktop-agent] ${msg}`),
 
-  resolveSpawn: (_claims, ctx) => ({
-    command: config.shell,
-    args: shellArgs(config.shell, ctx.command),
-    cwd: config.projectRoot,
-  }),
+  resolveSpawn: (claims, ctx) => {
+    if (!OWNER_ID || claims.sub !== OWNER_ID) {
+      throw new Error('unauthorized: PTY token owner is not this desktop’s linked user');
+    }
+    return {
+      command: config.shell,
+      args: shellArgs(config.shell, ctx.command),
+      cwd: config.projectRoot,
+    };
+  },
 
   onSessionExit: (_claims, ctx) => {
     // Best-effort: tell the API the desktop session ended so it's marked CLOSED.
@@ -67,8 +90,11 @@ async function goOffline(): Promise<void> {
 const timer = setInterval(() => void heartbeat(), config.heartbeatMs);
 void heartbeat();
 
-console.log(`[desktop-agent] PTY-over-WS server on ws://0.0.0.0:${config.port}`);
+console.log(`[desktop-agent] PTY-over-WS server on ws://${config.bindHost}:${config.port}`);
 console.log(`[desktop-agent] shell=${config.shell} cwd=${config.projectRoot}`);
+if (!OWNER_ID) {
+  console.warn('[desktop-agent] no valid POCKETDEV_TOKEN — PTY sessions are refused until linked');
+}
 console.log(
   `[desktop-agent] heartbeating to ${config.apiUrl} every ${config.heartbeatMs / 1000}s` +
     (config.tunnelUrl ? ` as ${config.tunnelUrl}` : ' (no tunnel URL set)'),

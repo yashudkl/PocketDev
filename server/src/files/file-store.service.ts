@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { FileManifest, FileNode } from '@pocketdev/shared';
 
 /** Never walk into (or serve a tree of) these — matches the CLI agent's ignore list. */
@@ -35,12 +35,15 @@ export class FileStoreService {
    */
   private safeResolve(projectRoot: string, relPath: string): string {
     const normalized = relPath.replace(/\\/g, '/').replace(/^\/+/, '');
-    const abs = resolve(projectRoot, normalized);
-    const rel = relative(projectRoot, abs);
-    if (rel === '' || rel.startsWith('..') || (rel.length > 0 && rel[0] === sep && rel.startsWith('..'))) {
+    // Reject anything absolute or drive-qualified BEFORE resolving. On Windows,
+    // path.relative() between different drives returns the absolute target
+    // (e.g. "D:\evil"), which contains no ".." and would otherwise slip through.
+    if (isAbsolute(relPath) || isAbsolute(normalized) || /^[a-zA-Z]:/.test(normalized)) {
       throw new BadRequestException(`Illegal path: ${relPath}`);
     }
-    if (rel.split(sep).includes('..')) {
+    const abs = resolve(projectRoot, normalized);
+    const rel = relative(projectRoot, abs);
+    if (rel === '' || rel.startsWith('..') || rel.split(sep).includes('..') || isAbsolute(rel)) {
       throw new BadRequestException(`Illegal path: ${relPath}`);
     }
     return abs;

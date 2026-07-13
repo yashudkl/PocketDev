@@ -85,7 +85,13 @@ export async function createSessionContainer(opts: ProvisionOpts): Promise<Docke
     },
   });
 
-  await container.start();
+  try {
+    await container.start();
+  } catch (err) {
+    // Created but failed to start — don't leak it.
+    await container.remove({ force: true }).catch(() => undefined);
+    throw err;
+  }
   return container;
 }
 

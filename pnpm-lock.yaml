@@ -324,10 +324,16 @@ importers:
       '@pocketdev/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       ws:
         specifier: ^8.18.0
         version: 8.21.0
     devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.1

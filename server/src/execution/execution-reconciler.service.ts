@@ -1,10 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  EXEC_CONTROL_CHANNEL,
   EXEC_EVENTS_CHANNEL,
   EXECUTION_QUEUE,
-  type ExecutionControlSignal,
   type ExecutionEvent,
 } from '@pocketdev/shared';
 import { QueueEvents } from 'bullmq';
@@ -24,7 +22,6 @@ import { SessionsService } from '../sessions/sessions.service';
 export class ExecutionReconciler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ExecutionReconciler.name);
   private sub?: Redis;
-  private pub?: Redis;
   private queueEvents?: QueueEvents;
 
   constructor(
@@ -54,9 +51,6 @@ export class ExecutionReconciler implements OnModuleInit, OnModuleDestroy {
       void this.onEvent(payload);
     });
 
-    this.pub = new Redis(opts);
-    this.pub.on('error', (err) => this.logger.warn(`redis pub error: ${err.message}`));
-
     this.queueEvents = new QueueEvents(EXECUTION_QUEUE, { connection: opts });
     this.queueEvents.on('failed', ({ jobId, failedReason }) => {
       void this.onQueueFailed(jobId, failedReason);
@@ -67,17 +61,7 @@ export class ExecutionReconciler implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.allSettled([
-      this.sub?.quit(),
-      this.pub?.quit(),
-      this.queueEvents?.close(),
-    ]);
-  }
-
-  /** Ask the worker to tear down a running session (server → worker control). */
-  async killSession(sessionId: string): Promise<void> {
-    const signal: ExecutionControlSignal = { type: 'kill-session', sessionId };
-    await this.pub?.publish(EXEC_CONTROL_CHANNEL, JSON.stringify(signal));
+    await Promise.allSettled([this.sub?.quit(), this.queueEvents?.close()]);
   }
 
   private async onEvent(payload: string): Promise<void> {
