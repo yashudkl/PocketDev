@@ -9,9 +9,11 @@ export const RUN_COMMAND_JOB = 'run-command';
 
 export interface RunCommandJobData {
   jobId: string;
+  sessionId: string;
   projectId: string;
   userId: string;
-  command: string;
+  /** Optional initial command; when absent the worker opens an interactive shell. */
+  command?: string;
   target: ExecutionTarget;
 }
 

@@ -1,19 +1,22 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ExecutionTarget, Tier } from '@prisma/client';
+import type { PtyTokenClaims, StartSessionResponse } from '@pocketdev/shared';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  EXECUTION_QUEUE,
-  RUN_COMMAND_JOB,
-  RunCommandJobData,
-} from './jobs.constants';
+import { SessionsService } from '../sessions/sessions.service';
+import { EXECUTION_QUEUE, RUN_COMMAND_JOB, RunCommandJobData } from './jobs.constants';
 import { CreateJobDto } from './dto/create-job.dto';
 
 @Injectable()
 export class JobsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService,
     @InjectQueue(EXECUTION_QUEUE) private readonly queue: Queue<RunCommandJobData>,
   ) {}
 
@@ -37,12 +40,15 @@ export class JobsService {
   }
 
   /**
-   * Create a job and enqueue it (Decision 2: API is the queue producer).
-   * Freemium behaviour (Definition of Done): free tier shares the queue at
-   * normal priority; paid tier jumps the line with higher priority.
-   * Routing (Decision 4): send to the desktop if its agent is online, else cloud.
+   * Create a job + session and hand the phone a PTY WebSocket to stream from.
+   *
+   * - Decision 2: the API is the queue producer; the worker consumes.
+   * - Freemium (Definition of Done): FREE shares the queue at normal priority;
+   *   PAID jumps the line (lower BullMQ priority number).
+   * - Decision 4 routing: run on the developer's desktop if its agent is online
+   *   AND advertised a tunnel URL, otherwise fall back to the cloud worker.
    */
-  async create(userId: string, tier: string, dto: CreateJobDto) {
+  async create(userId: string, tier: string, dto: CreateJobDto): Promise<StartSessionResponse> {
     const project = await this.prisma.project.findUnique({ where: { id: dto.projectId } });
     if (!project || project.userId !== userId) {
       throw new NotFoundException('Project not found');
@@ -50,49 +56,86 @@ export class JobsService {
 
     await this.enforceQuota(userId);
 
-    const target = await this.resolveTarget(userId);
+    const route = await this.resolveTarget(userId);
 
     const job = await this.prisma.job.create({
       data: {
         projectId: dto.projectId,
         userId,
         command: dto.command,
-        status: 'QUEUED',
-        target,
+        status: route.target === ExecutionTarget.DESKTOP ? 'RUNNING' : 'QUEUED',
+        startedAt: route.target === ExecutionTarget.DESKTOP ? new Date() : null,
+        target: route.target,
       },
     });
 
-    const isPaid = tier === Tier.PAID;
-    const queued = await this.queue.add(
-      RUN_COMMAND_JOB,
-      {
-        jobId: job.id,
-        projectId: job.projectId,
-        userId: job.userId,
-        command: job.command,
-        target,
-      },
-      {
-        // Lower number = higher priority in BullMQ. Paid users jump the queue.
-        priority: isPaid ? 1 : 10,
-        removeOnComplete: 100,
-        removeOnFail: 100,
-      },
-    );
-
-    return this.prisma.job.update({
-      where: { id: job.id },
-      data: { queueJobId: queued.id },
+    const session = await this.sessions.open({
+      userId,
+      projectId: dto.projectId,
+      jobId: job.id,
+      target: route.target,
     });
+
+    const wsToken = this.mintPtyToken(userId, session.id, dto.projectId);
+
+    if (route.target === ExecutionTarget.CLOUD) {
+      const isPaid = tier === Tier.PAID;
+      const queued = await this.queue.add(
+        RUN_COMMAND_JOB,
+        {
+          jobId: job.id,
+          sessionId: session.id,
+          projectId: job.projectId,
+          userId: job.userId,
+          command: job.command,
+          target: route.target,
+        },
+        {
+          // Lower number = higher priority in BullMQ. Paid users jump the queue.
+          priority: isPaid ? 1 : 10,
+          removeOnComplete: 100,
+          removeOnFail: 100,
+        },
+      );
+      await this.prisma.job.update({
+        where: { id: job.id },
+        data: { queueJobId: queued.id },
+      });
+    }
+
+    return {
+      jobId: job.id,
+      sessionId: session.id,
+      target: route.target,
+      wsUrl: route.target === ExecutionTarget.CLOUD ? this.workerWsUrl() : route.tunnelUrl!,
+      wsToken,
+    };
+  }
+
+  private mintPtyToken(userId: string, sessionId: string, projectId: string): string {
+    const claims: PtyTokenClaims = { sub: userId, sessionId, projectId, scope: 'pty' };
+    const ttl = this.config.get<string>('execution.wsTokenTtl') ?? '5m';
+    return this.jwt.sign(claims, { expiresIn: ttl as JwtSignOptions['expiresIn'] });
+  }
+
+  private workerWsUrl(): string {
+    return this.config.get<string>('execution.workerWsUrl') ?? 'ws://localhost:4100';
   }
 
   /** Desktop-if-present-else-cloud routing (Decision 4). */
-  private async resolveTarget(userId: string): Promise<ExecutionTarget> {
+  private async resolveTarget(
+    userId: string,
+  ): Promise<{ target: ExecutionTarget; tunnelUrl?: string }> {
     const presence = await this.prisma.desktopPresence.findUnique({ where: { userId } });
+    const windowMs =
+      this.config.get<number>('execution.desktopHeartbeatWindowMs') ?? 30_000;
     const fresh =
-      presence?.online &&
-      Date.now() - presence.lastHeartbeat.getTime() < 30_000; // 30s heartbeat window
-    return fresh ? ExecutionTarget.DESKTOP : ExecutionTarget.CLOUD;
+      !!presence?.online &&
+      !!presence.tunnelUrl &&
+      Date.now() - presence.lastHeartbeat.getTime() < windowMs;
+    return fresh
+      ? { target: ExecutionTarget.DESKTOP, tunnelUrl: presence!.tunnelUrl! }
+      : { target: ExecutionTarget.CLOUD };
   }
 
   /** Daily job quota per subscription; resets on a rolling 24h window. */
@@ -106,7 +149,7 @@ export class JobsService {
     if (now.getTime() - sub.quotaResetAt.getTime() > 24 * 60 * 60 * 1000) {
       await this.prisma.subscription.update({
         where: { userId },
-        data: { jobsUsedToday: 0, quotaResetAt: now },
+        data: { jobsUsedToday: 1, quotaResetAt: now },
       });
       return;
     }

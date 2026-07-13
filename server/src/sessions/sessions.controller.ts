@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { SessionsService } from './sessions.service';
 
@@ -14,5 +14,11 @@ export class SessionsController {
   @Get('history')
   history(@CurrentUser() user: AuthUser) {
     return this.sessions.history(user.userId);
+  }
+
+  @HttpCode(200)
+  @Post(':id/close')
+  close(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.sessions.close(user.userId, id);
   }
 }

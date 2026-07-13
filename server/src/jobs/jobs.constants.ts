@@ -1,14 +1,7 @@
-/** Name of the BullMQ queue shared between the API (producer) and the worker (consumer). */
-export const EXECUTION_QUEUE = 'execution';
-
-/** Job name added to the execution queue. */
-export const RUN_COMMAND_JOB = 'run-command';
-
-/** Shape of the payload handed to the execution worker. */
-export interface RunCommandJobData {
-  jobId: string;
-  projectId: string;
-  userId: string;
-  command: string;
-  target: 'CLOUD' | 'DESKTOP';
-}
+// Re-export the single source of truth from @pocketdev/shared so the API
+// (producer) and the execution worker (consumer) can never drift.
+export {
+  EXECUTION_QUEUE,
+  RUN_COMMAND_JOB,
+  type RunCommandJobData,
+} from '@pocketdev/shared';

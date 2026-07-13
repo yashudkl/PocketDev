@@ -13,6 +13,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@pocketdev/pty-core": "workspace:*",
     "@pocketdev/shared": "workspace:*",
     "ws": "^8.18.0"
   },

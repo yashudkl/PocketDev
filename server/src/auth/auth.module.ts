@@ -10,6 +10,8 @@ import { JwtStrategy } from './jwt.strategy';
   imports: [
     PassportModule,
     JwtModule.registerAsync({
+      // Global so SyncGateway / session-token minting can inject JwtService.
+      global: true,
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

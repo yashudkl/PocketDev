@@ -15,7 +15,8 @@ documented in [`PROJECT-BRIEF.md`](./PROJECT-BRIEF.md) and [`BUILD-PLAN.md`](./B
 | [`services/execution-worker/`](./services/execution-worker) | `@pocketdev/execution-worker` | The one split-out process — BullMQ **consumer**: Docker + node-pty + WebSocket PTY streaming. |
 | [`services/cli-agent/`](./services/cli-agent) | `@pocketdev/cli-agent` | CLI sync agent — chokidar delta-sync over WebSocket. |
 | [`services/desktop-agent/`](./services/desktop-agent) | `@pocketdev/desktop-agent` | Local desktop runtime — same PTY-over-WS server + presence heartbeat (Cloudflare Tunnel). |
-| [`packages/shared/`](./packages/shared) | `@pocketdev/shared` | Shared TypeScript contracts: queue payloads, PTY protocol, sync protocol, domain enums. |
+| [`packages/shared/`](./packages/shared) | `@pocketdev/shared` | Shared TypeScript contracts: queue payloads, PTY/sync/exec-event/git/file protocols, domain enums. |
+| [`packages/pty-core/`](./packages/pty-core) | `@pocketdev/pty-core` | Shared PTY-over-WebSocket gateway (node-pty + ws + flow control + JWT). Used by both the worker (Docker runner) and desktop agent (host runner). |
 
 The modular monolith's modules **are** the future service boundaries. The only genuine
 seam split out now is the execution engine (Build Plan, Decision 2).
@@ -93,18 +94,64 @@ pnpm mobile:dev      # Expo dev server
 
 ## Status
 
-This is the **demo scaffold** (Weeks 1–2 of the 14-week plan): monorepo, NestJS modules,
-Prisma schema, queue wiring, and mobile app are in place. The execution engine, CLI
-sync, desktop runtime, on-device LLM, and gVisor hardening are scaffolded with clear
-`TODO` markers pointing at their phase in the build plan.
+The **backend is built end-to-end** (everything except the mobile app UI and the
+on-device LLM, which lives on the phone). All six workspaces build and type-check,
+and the unit tests pass.
 
+| Area | State |
+|---|---|
+| Auth / users / projects / billing / tiers | ✅ API complete |
+| CLI delta-sync → server file store (JSONB manifest) | ✅ `services/cli-agent` + `/sync` gateway |
+| File browse / read / write API | ✅ `GET/PUT/DELETE /projects/:id/file(s)` |
+| Terminal session start + tier-priority queue | ✅ `POST /jobs` → `StartSessionResponse` |
+| Execution engine — hardened Docker + real PTY over WS | ✅ `services/execution-worker` + `packages/pty-core` |
+| gVisor (`runsc`) hardening | ✅ one-env-var switch (`EXECUTION_RUNTIME=runsc`) |
+| Local-desktop runtime + presence routing | ✅ `services/desktop-agent`, desktop-if-present-else-cloud |
+| Git from the phone (status/commit/push/…) | ✅ `/projects/:id/git/*` (simple-git) |
+| Execution-status reconciliation (worker → Redis → DB) | ✅ `ExecutionReconciler` (worker never touches the DB) |
+| Queue dashboard | ✅ Bull Board at `/admin/queues` (basic-auth) |
+| Mobile app UI · on-device LLM | ⏳ out of scope for this backend pass |
 
-## To Run it
+**Architecture note:** the execution worker (the untrusted-code blast radius) never
+touches Postgres. It publishes lifecycle events on Redis; the API reconciles them into
+the DB (BUILD-PLAN Decision 2). The PTY-over-WebSocket server is shared code
+(`packages/pty-core`) used by *both* the cloud worker (Docker runner) and the desktop
+agent (host runner).
 
-docker compose up -d
-cp server/.env.example server/.env && cp mobile/.env.example mobile/.env
-pnpm --filter @pocketdev/server db:migrate
-pnpm --filter @pocketdev/server db:seed      # free@ / paid@pocketdev.dev · password123
-pnpm server:dev   # :3000
-pnpm worker:dev
-pnpm mobile:dev
+## Run it
+
+```bash
+pnpm install
+docker compose up -d                                # Postgres + Redis
+cp .env.example server/.env                          # then edit JWT_SECRET etc.
+pnpm --filter @pocketdev/server db:migrate           # prisma migrate dev
+pnpm --filter @pocketdev/server db:seed              # free@ / paid@pocketdev.dev · password123
+pnpm server:dev                                      # API + /admin/queues on :3000
+pnpm worker:dev                                      # execution worker + PTY gateway on :4100 (needs Docker)
+```
+
+## Verification (end-to-end, needs Docker + Postgres + Redis)
+
+```bash
+# 1. Auth → grab a token
+TOKEN=$(curl -s localhost:3000/auth/login -H 'content-type: application/json' \
+  -d '{"email":"free@pocketdev.dev","password":"password123"}' | jq -r .accessToken)
+
+# 2. Find the seeded project id
+PROJECT=$(curl -s localhost:3000/projects -H "authorization: Bearer $TOKEN" | jq -r '.[0].id')
+
+# 3. Sync a local folder up
+POCKETDEV_TOKEN=$TOKEN pnpm --filter @pocketdev/cli-agent start sync ./some-folder -p $PROJECT
+
+# 4. Start a terminal session (returns wsUrl + wsToken); connect a WS client and
+#    speak the pty-protocol ({type:"start", sessionId, projectId, token}).
+curl -s localhost:3000/jobs -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d "{\"projectId\":\"$PROJECT\",\"command\":\"node -v\"}"
+
+# 5. Freemium: with WORKER_CONCURRENCY=1, a 2nd FREE session queues while a PAID one jumps.
+#    Watch it live in the dashboard at http://localhost:3000/admin/queues (admin/admin).
+```
+
+For the desktop-runtime path, run `pnpm --filter @pocketdev/desktop-agent start` with
+`POCKETDEV_TOKEN` + `JWT_SECRET` set, expose it via `cloudflared`, and `POCKETDEV_TUNNEL_URL`
+will make the API route that user's sessions to the desktop instead of the cloud.
