@@ -37,6 +37,13 @@
       "prisma",
       "esbuild",
       "node-pty"
-    ]
+    ],
+    "overrides": {
+      "metro": "0.84.4",
+      "metro-cache-key": "0.84.4",
+      "metro-config": "0.84.4",
+      "metro-runtime": "0.84.4",
+      "metro-resolver": "0.84.4"
+    }
   }
 }

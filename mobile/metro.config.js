@@ -15,7 +15,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-config.resolver.disableHierarchicalLookup = true;
+// Keep hierarchical lookup ON (Expo's recommended monorepo default) — pnpm with
+// node-linker=hoisted resolves fine, and disabling it trips expo-doctor.
 
 // ─── SVG Transformer ─────────────────────────────────────────────────────────
 config.transformer.babelTransformerPath = require.resolve('react-native-svg-transformer');

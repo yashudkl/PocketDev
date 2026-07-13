@@ -8,16 +8,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Brand accent: cyan/teal — technical, infra-tool feel (Netlify/Supabase
+        // family), pairs with a near-black base + monospace, and stays distinct
+        // from the semantic status greens/ambers/reds below. Swap freely.
         primary: {
-          DEFAULT: '#6C63FF',
-          light: '#9D97FF',
-          dark: '#4B44CC',
+          DEFAULT: '#22D3EE',
+          light: '#67E8F9',
+          dark: '#0E7490',
         },
+        // Secondary = a calm slate for secondary buttons/borders on dark.
         secondary: {
-          DEFAULT: '#FF6584',
-          light: '#FF94A8',
-          dark: '#CC4D68',
+          DEFAULT: '#64748B',
+          light: '#94A3B8',
+          dark: '#475569',
         },
+        // Semantic status — wire StatusChip / online dots / exit codes to these.
+        success: { DEFAULT: '#22C55E', light: '#4ADE80', dark: '#15803D' }, // running / online / exit 0
+        warning: { DEFAULT: '#F59E0B', light: '#FBBF24', dark: '#B45309' }, // queued / dirty
+        danger: { DEFAULT: '#EF4444', light: '#F87171', dark: '#B91C1C' },  // failed / exit != 0
+        info: { DEFAULT: '#3B82F6', light: '#60A5FA', dark: '#1D4ED8' },
         neutral: {
           50: '#FAFAFA',
           100: '#F5F5F5',
@@ -30,9 +39,11 @@ module.exports = {
           800: '#262626',
           900: '#171717',
         },
+        // Dark-first surfaces (near-black, GitHub-dark family) + an elevated layer.
         surface: {
           DEFAULT: '#FFFFFF',
-          dark: '#1A1A1A',
+          dark: '#0D1117',
+          elevated: '#161B22',
         },
       },
       borderRadius: {
