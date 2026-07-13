@@ -15,6 +15,8 @@ import { DesktopModule } from './desktop/desktop.module';
 import { HealthModule } from './health/health.module';
 import { FilesModule } from './files/files.module';
 import { SyncModule } from './sync/sync.module';
+import { GitModule } from './git/git.module';
+import { ExecutionModule } from './execution/execution.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { SyncModule } from './sync/sync.module';
     HealthModule,
     FilesModule,
     SyncModule,
+    GitModule,
+    ExecutionModule,
   ],
   providers: [
     // JWT required by default; opt out per-route with @Public().
