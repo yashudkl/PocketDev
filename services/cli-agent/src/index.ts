@@ -1,60 +1,135 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import chokidar from 'chokidar';
 import { Command } from 'commander';
-import type { FileManifest } from '@pocketdev/shared';
+import { IGNORED_DIRS } from './manifest';
+import { syncOnce } from './sync-client';
 
-// Ignore junk (Build Plan: chokidar with an ignore list + awaitWriteFinish).
-const IGNORED = [/(^|[/\\])\.git/, /node_modules/, /dist/, /\.expo/, /\.turbo/];
-
-function hashFile(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
+/** Normalize an http(s)/ws(s) base URL to a ws(s) one for the /sync socket. */
+function toWs(url: string): string {
+  return url.replace(/^http/i, 'ws');
 }
 
-function manifestEntry(root: string, path: string): FileManifest[string] | null {
-  try {
-    const stat = statSync(path);
-    if (!stat.isFile()) return null;
-    return {
-      path: relative(root, path).split('\\').join('/'),
-      size: stat.size,
-      mtimeMs: stat.mtimeMs,
-      hash: hashFile(path),
-    };
-  } catch {
-    return null;
+interface CommonOpts {
+  project?: string;
+  server: string;
+  token?: string;
+}
+
+function resolveAuth(opts: CommonOpts): { projectId: string; token: string; server: string } {
+  const projectId = opts.project ?? process.env.POCKETDEV_PROJECT ?? '';
+  const token = opts.token ?? process.env.POCKETDEV_TOKEN ?? '';
+  const server = toWs(opts.server ?? process.env.POCKETDEV_API_URL ?? 'ws://localhost:3000');
+  if (!projectId) {
+    console.error('Missing --project (or POCKETDEV_PROJECT).');
+    process.exit(1);
   }
+  if (!token) {
+    console.error('Missing --token (or POCKETDEV_TOKEN). Log in to get a JWT.');
+    process.exit(1);
+  }
+  return { projectId, token, server };
 }
+
+const log = (msg: string): void => console.log(`[cli-agent] ${msg}`);
 
 const program = new Command();
 program.name('pocketdev').description('PocketDev CLI sync agent').version('0.1.0');
 
 program
+  .command('sync')
+  .argument('<dir>', 'project directory to sync')
+  .option('-p, --project <id>', 'project id on the server')
+  .option('-s, --server <url>', 'server URL (http/ws)', 'ws://localhost:3000')
+  .option('-t, --token <jwt>', 'access token (JWT)')
+  .description('One-shot delta-sync of a folder to the server')
+  .action(async (dir: string, opts: CommonOpts) => {
+    const { projectId, token, server } = resolveAuth(opts);
+    const root = resolve(dir);
+    log(`syncing ${root} → ${server} (project ${projectId})`);
+    try {
+      const res = await syncOnce({ server, token, projectId, root, log });
+      log(`done: ${res.changed} sent, ${res.removed} removed`);
+    } catch (err) {
+      console.error(`[cli-agent] sync failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('watch')
   .argument('<dir>', 'project directory to watch')
   .option('-p, --project <id>', 'project id on the server')
-  .option('-s, --server <url>', 'server WebSocket URL', 'ws://localhost:3000')
-  .description('Watch a folder and delta-sync changes to the server')
-  .action((dir: string, opts: { project?: string; server: string }) => {
+  .option('-s, --server <url>', 'server URL (http/ws)', 'ws://localhost:3000')
+  .option('-t, --token <jwt>', 'access token (JWT)')
+  .option('-d, --debounce <ms>', 'debounce window for change bursts', '600')
+  .description('Watch a folder and delta-sync on every change (BUILD-PLAN Weeks 3–4)')
+  .action(async (dir: string, opts: CommonOpts & { debounce: string }) => {
+    const { projectId, token, server } = resolveAuth(opts);
     const root = resolve(dir);
-    console.log(`[cli-agent] watching ${root}`);
-    console.log(`[cli-agent] project=${opts.project ?? '(unset)'} server=${opts.server}`);
+    const debounceMs = parseInt(opts.debounce, 10) || 600;
+
+    const runSync = makeSerializedSync({ server, token, projectId, root });
+    log(`initial sync of ${root} …`);
+    await runSync();
 
     const watcher = chokidar.watch(root, {
-      ignored: IGNORED,
-      ignoreInitial: false,
+      ignored: (p: string) => p.split(/[\\/]/).some((seg) => IGNORED_DIRS.has(seg)),
+      ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 },
     });
 
-    watcher.on('all', (event, path) => {
-      const entry = manifestEntry(root, path);
-      // TODO (Weeks 3–4): diff against the server manifest and push only changed
-      // files as SyncClientMessage frames over the WebSocket.
-      console.log(`[cli-agent] ${event.padEnd(7)} ${entry ? entry.path : relative(root, path)}`);
+    let timer: NodeJS.Timeout | undefined;
+    const schedule = (event: string, path: string): void => {
+      log(`${event} ${path}`);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void runSync(), debounceMs);
+    };
+    watcher.on('add', (p) => schedule('add', p));
+    watcher.on('change', (p) => schedule('change', p));
+    watcher.on('unlink', (p) => schedule('unlink', p));
+    watcher.on('ready', () =>
+      log(`watching for changes (debounce ${debounceMs}ms) — Ctrl+C to stop`),
+    );
+
+    process.on('SIGINT', () => {
+      void watcher.close().then(() => process.exit(0));
     });
   });
+
+/**
+ * Serialize syncs so overlapping change bursts don't race: if a sync is running
+ * and another is requested, run exactly one more after it finishes.
+ */
+function makeSerializedSync(base: {
+  server: string;
+  token: string;
+  projectId: string;
+  root: string;
+}): () => Promise<void> {
+  let running = false;
+  let queued = false;
+  const run = async (): Promise<void> => {
+    if (running) {
+      queued = true;
+      return;
+    }
+    running = true;
+    try {
+      const res = await syncOnce({ ...base, log });
+      log(`synced: ${res.changed} sent, ${res.removed} removed`);
+    } catch (err) {
+      console.error(`[cli-agent] sync failed: ${(err as Error).message}`);
+    } finally {
+      running = false;
+      if (queued) {
+        queued = false;
+        void run();
+      }
+    }
+  };
+  return run;
+}
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);
