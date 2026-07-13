@@ -18,9 +18,11 @@ export function startPtyGateway(registry: SessionRegistry): PtyGateway {
     logger: (msg) => console.log(`[pty-gateway] ${msg}`),
 
     resolveSpawn: async (claims, ctx): Promise<SpawnSpec> => {
-      const entry = await registry.waitFor(ctx.sessionId, 10_000);
+      // Wait long enough to sit in the FREE-tier queue behind an active session
+      // and then stream once a slot frees (not just the ~instant provisioning case).
+      const entry = await registry.waitFor(ctx.sessionId, config.queueWaitS * 1000);
       if (!entry) {
-        throw new Error('session container not provisioned (timed out)');
+        throw new Error('session container not provisioned (timed out in queue)');
       }
       if (entry.userId !== claims.sub) {
         throw new Error('token does not match session owner');

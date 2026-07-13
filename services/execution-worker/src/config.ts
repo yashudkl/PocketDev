@@ -46,6 +46,10 @@ export const config = {
   concurrency: num(process.env.WORKER_CONCURRENCY, 2),
   /** Seconds to hold a provisioned container waiting for the phone to attach. */
   connectTimeoutS: num(process.env.SESSION_CONNECT_TIMEOUT_S, 60),
+  /** Seconds a connected client waits for its (possibly QUEUED) job to be
+   *  scheduled and its container provisioned — long enough to sit in the free
+   *  tier queue behind an active session, then stream once a slot frees. */
+  queueWaitS: num(process.env.SESSION_QUEUE_WAIT_S, 300),
   /** Hard wall-clock cap on a single session. */
   maxDurationS: num(process.env.SESSION_MAX_DURATION_S, 1800),
 } as const;
