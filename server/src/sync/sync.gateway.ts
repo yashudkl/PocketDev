@@ -63,7 +63,11 @@ export class SyncGateway implements OnModuleInit, OnModuleDestroy {
   private handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const { pathname, token } = this.parseUrl(req);
     if (pathname !== SYNC_PATH) {
-      return; // not ours — leave other upgrade handlers a chance, then it 404s
+      // /sync is the only WebSocket on this HTTP server — reject anything else
+      // rather than leaving the upgrade socket dangling.
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+      return;
     }
     const userId = this.verify(token);
     if (!userId) {

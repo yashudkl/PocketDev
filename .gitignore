@@ -52,3 +52,4 @@ Thumbs.db
 coverage/
 tmp/
 temp/
+.pocketdev-store/

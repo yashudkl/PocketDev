@@ -1,3 +1,19 @@
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+
+/** Walk up to the monorepo root so FILE_STORE_ROOT resolves to the same absolute
+ *  directory the execution worker uses (it anchors there too), regardless of cwd. */
+function findRepoRoot(start: string = process.cwd()): string {
+  let dir = resolve(start);
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return resolve(start);
+}
+
 export interface AppConfig {
   nodeEnv: string;
   port: number;
@@ -40,7 +56,7 @@ export default (): AppConfig => ({
     password: process.env.REDIS_PASSWORD || undefined,
   },
   fileStore: {
-    root: process.env.FILE_STORE_ROOT ?? './.pocketdev-store',
+    root: resolve(findRepoRoot(), process.env.FILE_STORE_ROOT ?? './.pocketdev-store'),
   },
   execution: {
     workerWsUrl: process.env.WORKER_WS_URL ?? 'ws://localhost:4100',

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
+import { dirname } from 'node:path';
 import simpleGit, { type SimpleGit } from 'simple-git';
 import type {
   GitBranchInfo,
@@ -23,7 +24,12 @@ export class GitService {
   private async git(userId: string, projectId: string): Promise<SimpleGit> {
     const dir = this.files.projectDir(userId, projectId);
     await fs.mkdir(dir, { recursive: true });
-    return simpleGit(dir);
+    // CRITICAL isolation: the file store may live inside another git repo (e.g.
+    // during local dev the store is under the PocketDev checkout). Git normally
+    // walks UP to the nearest .git, which would make every project operate on the
+    // wrong repo. GIT_CEILING_DIRECTORIES stops that upward search at the store,
+    // so a project only ever uses its OWN .git (created by init()).
+    return simpleGit(dir).env({ ...process.env, GIT_CEILING_DIRECTORIES: dirname(dir) });
   }
 
   private async requireRepo(git: SimpleGit): Promise<void> {
@@ -42,6 +48,12 @@ export class GitService {
     const git = await this.git(userId, projectId);
     if (!(await git.checkIsRepo())) {
       await this.wrap(git.init(['--initial-branch=main']));
+      // Set a local identity so commits work even when the host has no global
+      // git user configured (e.g. the demo VM).
+      await git.addConfig('user.name', 'PocketDev', false, 'local').catch(() => undefined);
+      await git
+        .addConfig('user.email', 'pocketdev@local', false, 'local')
+        .catch(() => undefined);
     }
     const status = await git.status();
     return { initialized: true, branch: status.current ?? 'main' };

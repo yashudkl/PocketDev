@@ -7,9 +7,12 @@ import { EXECUTION_QUEUE } from '@pocketdev/shared';
 import type { Queue } from 'bullmq';
 import type { NextFunction, Request, Response } from 'express';
 
+import { Logger } from '@nestjs/common';
+
 const BOARD_PATH = '/admin/queues';
 const USER = process.env.BULLBOARD_USER ?? 'admin';
 const PASS = process.env.BULLBOARD_PASSWORD ?? 'admin';
+const USING_DEFAULT_CREDS = !process.env.BULLBOARD_USER && !process.env.BULLBOARD_PASSWORD;
 
 /** HTTP Basic auth — this dashboard sits outside the JWT-guarded API routes. */
 function basicAuth(req: Request, res: Response, next: NextFunction): void {
@@ -31,7 +34,18 @@ function basicAuth(req: Request, res: Response, next: NextFunction): void {
  * execution queue — waiting/active/failed jobs, the freemium priority ordering,
  * and dead-lettered failures. Basic-auth protected.
  */
-export function mountBullBoard(app: INestApplication): string {
+export function mountBullBoard(app: INestApplication): string | null {
+  const logger = new Logger('BullBoard');
+  // Never expose the dashboard with default creds in production.
+  if (USING_DEFAULT_CREDS && process.env.NODE_ENV === 'production') {
+    logger.error(
+      'Refusing to mount /admin/queues: set BULLBOARD_USER and BULLBOARD_PASSWORD in production',
+    );
+    return null;
+  }
+  if (USING_DEFAULT_CREDS) {
+    logger.warn('/admin/queues uses default admin/admin — set BULLBOARD_USER/PASSWORD');
+  }
   const queue = app.get<Queue>(getQueueToken(EXECUTION_QUEUE));
   const serverAdapter = new ExpressAdapter();
   serverAdapter.setBasePath(BOARD_PATH);

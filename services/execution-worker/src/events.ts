@@ -20,8 +20,11 @@ export class ExecEvents {
     const opts = { ...config.redis, maxRetriesPerRequest: null as null };
     this.pub = new Redis(opts);
     this.sub = new Redis(opts);
-    this.pub.on('error', (err) => console.warn(`[events] pub error: ${err.message}`));
-    this.sub.on('error', (err) => console.warn(`[events] sub error: ${err.message}`));
+    // Include .code — some connection errors (e.g. IPv6 localhost refusals) have
+    // an empty .message, which otherwise logs as a blank, confusing line.
+    const fmt = (err: Error & { code?: string }) => err.message || err.code || 'unknown';
+    this.pub.on('error', (err) => console.warn(`[events] redis pub: ${fmt(err)}`));
+    this.sub.on('error', (err) => console.warn(`[events] redis sub: ${fmt(err)}`));
 
     void this.sub.subscribe(EXEC_CONTROL_CHANNEL).catch((err) => {
       console.warn(`[events] control subscribe failed: ${err.message}`);
