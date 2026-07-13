@@ -334,6 +334,9 @@ importers:
 
   services/execution-worker:
     dependencies:
+      '@pocketdev/pty-core':
+        specifier: workspace:*
+        version: link:../../packages/pty-core
       '@pocketdev/shared':
         specifier: workspace:*
         version: link:../../packages/shared
