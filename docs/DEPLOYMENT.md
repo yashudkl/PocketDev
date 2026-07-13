@@ -199,11 +199,21 @@ It prints a boxed `https://<random>.trycloudflare.com`. Your desktop’s public 
 `wss://` form of it. **[FLAG]** Quick tunnels are testing-only: the URL changes on every restart,
 cap ~200 in-flight requests. Source: [trycloudflare doc](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
 
-**Stable — named tunnel** (your domain, survives restarts, runs as a service):
+**Stable — named tunnel** (your domain, survives restarts, runs as a service).
+Needs a Cloudflare account + a domain you own. Two account-specific steps first
+(a browser opens for login), then the helper script does the rest:
 
 ```bash
-cloudflared tunnel login
-cloudflared tunnel create pocketdev-desktop        # note the printed UUID
+cloudflared tunnel login                           # your Cloudflare account
+cloudflared tunnel create pocketdev-desktop        # creates the tunnel + creds
+# then, in an ELEVATED PowerShell (service install needs admin):
+./scripts/setup-named-tunnel.ps1 -Name pocketdev-desktop -Hostname desktop.yourdomain.com
+```
+
+That script routes the DNS, writes `config.yml`, and installs the auto-start
+Windows service. Manual equivalent:
+
+```bash
 cloudflared tunnel route dns pocketdev-desktop desktop.yourdomain.com
 ```
 `~/.cloudflared/config.yml`:

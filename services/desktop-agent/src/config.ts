@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { delimiter, join, resolve } from 'node:path';
 import { loadSharedEnv } from '@pocketdev/pty-core';
 
 // Side effect: load server/.env so JWT_SECRET matches the API (the desktop
@@ -10,10 +11,29 @@ function num(v: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** Pick a sensible interactive shell per-OS unless overridden. */
+/** First matching executable on PATH, or null (Windows tries .exe too). */
+function findOnPath(exe: string): string | null {
+  const exts = process.platform === 'win32' ? ['.exe', ''] : [''];
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const full = join(dir, exe + ext);
+      if (existsSync(full)) return full;
+    }
+  }
+  return null;
+}
+
+/**
+ * Pick a sensible interactive shell unless overridden by DESKTOP_SHELL.
+ * Windows: prefer PowerShell 7 (`pwsh`) if installed, else Windows PowerShell
+ * (`powershell.exe`, always present) — both far nicer than the legacy `cmd.exe`.
+ */
 function defaultShell(): string {
   if (process.env.DESKTOP_SHELL) return process.env.DESKTOP_SHELL;
-  if (process.platform === 'win32') return process.env.COMSPEC ?? 'cmd.exe';
+  if (process.platform === 'win32') {
+    return findOnPath('pwsh') ?? 'powershell.exe';
+  }
   return process.env.SHELL ?? 'bash';
 }
 
