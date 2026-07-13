@@ -1,56 +1,88 @@
-import { WebSocketServer } from 'ws';
-import type { PtyClientMessage } from '@pocketdev/shared';
+import { createPtyGateway, jwtVerifier } from '@pocketdev/pty-core';
+import { config, shellArgs } from './config';
 
-const PORT = parseInt(process.env.DESKTOP_AGENT_PORT ?? '4000', 10);
-const API_URL = process.env.POCKETDEV_API_URL ?? 'http://localhost:3000';
-const TOKEN = process.env.POCKETDEV_TOKEN ?? '';
-const TUNNEL_URL = process.env.POCKETDEV_TUNNEL_URL; // set by cloudflared in the demo
-const HEARTBEAT_MS = 15_000;
+// ── PTY gateway ──────────────────────────────────────────────────────────────
+// The SAME PTY-over-WS server the cloud worker runs (via @pocketdev/pty-core),
+// but the runner spawns a shell directly on THIS machine — that's the whole
+// "run on your own desktop when it's on" feature (BUILD-PLAN Decision 4). The
+// phone reaches it through the Cloudflare Tunnel and authenticates with the
+// same API-minted PTY token (verified here with the shared JWT secret).
+const gateway = createPtyGateway({
+  port: config.port,
+  verify: jwtVerifier(config.jwtSecret),
+  logger: (msg) => console.log(`[desktop-agent] ${msg}`),
 
-// Same PTY-over-WebSocket server the cloud worker runs, but on the dev's machine.
-const wss = new WebSocketServer({ port: PORT });
+  resolveSpawn: (_claims, ctx) => ({
+    command: config.shell,
+    args: shellArgs(config.shell, ctx.command),
+    cwd: config.projectRoot,
+  }),
 
-wss.on('connection', (ws) => {
-  console.log('[desktop-agent] client connected');
-  ws.on('message', (raw) => {
-    let msg: PtyClientMessage;
-    try {
-      msg = JSON.parse(raw.toString()) as PtyClientMessage;
-    } catch {
-      return;
-    }
-    // TODO (Weeks 9–10): spawn node-pty for `start`, feed `input`, `resize`, `kill`,
-    // and stream PtyServerMessage frames back over this socket.
-    console.log(`[desktop-agent] message type=${msg.type}`);
-  });
-  ws.on('close', () => console.log('[desktop-agent] client disconnected'));
+  onSessionExit: (_claims, ctx) => {
+    // Best-effort: tell the API the desktop session ended so it's marked CLOSED.
+    void closeSession(ctx.sessionId);
+  },
 });
 
-// Presence: tell the API this desktop is online so the API routes execution here
-// (desktop-if-present-else-cloud). Uses global fetch (Node 18+), no extra deps.
-async function heartbeat(): Promise<void> {
-  if (!TOKEN) return; // not linked yet
+async function closeSession(sessionId: string): Promise<void> {
+  if (!config.token) return;
   try {
-    await fetch(`${API_URL}/desktop/heartbeat`, {
+    await fetch(`${config.apiUrl}/sessions/${sessionId}/close`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
-      body: JSON.stringify({ tunnelUrl: TUNNEL_URL }),
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+  } catch {
+    /* offline — the server's TTL/heartbeat window will reconcile */
+  }
+}
+
+// ── Presence heartbeat ───────────────────────────────────────────────────────
+// Advertise "this desktop is online at <tunnelUrl>" so the API routes execution
+// here instead of the cloud (desktop-if-present-else-cloud).
+async function heartbeat(): Promise<void> {
+  if (!config.token) return; // not linked yet
+  try {
+    await fetch(`${config.apiUrl}/desktop/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.token}` },
+      body: JSON.stringify({ tunnelUrl: config.tunnelUrl }),
     });
   } catch (err) {
     console.warn(`[desktop-agent] heartbeat failed: ${(err as Error).message}`);
   }
 }
 
-const timer = setInterval(heartbeat, HEARTBEAT_MS);
+async function goOffline(): Promise<void> {
+  if (!config.token) return;
+  try {
+    await fetch(`${config.apiUrl}/desktop/offline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+const timer = setInterval(() => void heartbeat(), config.heartbeatMs);
 void heartbeat();
 
-console.log(`[desktop-agent] PTY-over-WS server on ws://localhost:${PORT}`);
-console.log(`[desktop-agent] heartbeating to ${API_URL} every ${HEARTBEAT_MS / 1000}s`);
+console.log(`[desktop-agent] PTY-over-WS server on ws://0.0.0.0:${config.port}`);
+console.log(`[desktop-agent] shell=${config.shell} cwd=${config.projectRoot}`);
+console.log(
+  `[desktop-agent] heartbeating to ${config.apiUrl} every ${config.heartbeatMs / 1000}s` +
+    (config.tunnelUrl ? ` as ${config.tunnelUrl}` : ' (no tunnel URL set)'),
+);
+if (!config.token) {
+  console.warn('[desktop-agent] POCKETDEV_TOKEN not set — presence disabled until linked');
+}
 
 async function shutdown(): Promise<void> {
+  console.log('[desktop-agent] shutting down …');
   clearInterval(timer);
-  wss.close();
+  await goOffline();
+  await gateway.close();
   process.exit(0);
 }
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());

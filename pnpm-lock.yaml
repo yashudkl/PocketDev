@@ -309,6 +309,9 @@ importers:
 
   services/desktop-agent:
     dependencies:
+      '@pocketdev/pty-core':
+        specifier: workspace:*
+        version: link:../../packages/pty-core
       '@pocketdev/shared':
         specifier: workspace:*
         version: link:../../packages/shared
