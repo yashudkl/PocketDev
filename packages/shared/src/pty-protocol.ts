@@ -3,7 +3,17 @@
 
 /** Messages sent from the client (phone) to the PTY server. */
 export type PtyClientMessage =
-  | { type: 'start'; sessionId: string; projectId: string; command?: string }
+  | {
+      type: 'start';
+      sessionId: string;
+      projectId: string;
+      command?: string;
+      cols?: number;
+      rows?: number;
+      // Short-lived wsToken (scope "pty") minted by the API. May also be passed
+      // as a `?token=` query param on the WebSocket URL instead of here.
+      token?: string;
+    }
   | { type: 'input'; sessionId: string; data: string }
   | { type: 'resize'; sessionId: string; cols: number; rows: number }
   | { type: 'kill'; sessionId: string };
