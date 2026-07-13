@@ -1,4 +1,9 @@
 import { resolve } from 'node:path';
+import { loadSharedEnv } from '@pocketdev/pty-core';
+
+// Side effect: load server/.env so JWT_SECRET matches the API (the desktop
+// verifies API-minted PTY tokens). Must run before we read process.env below.
+loadSharedEnv();
 
 function num(v: string | undefined, fallback: number): number {
   const n = parseInt(v ?? '', 10);

@@ -1,4 +1,9 @@
 import { resolve } from 'node:path';
+import { loadSharedEnv } from '@pocketdev/pty-core';
+
+// Side effect: load server/.env so JWT_SECRET/REDIS/etc match the API. Must run
+// before we read process.env below. Returns the repo root for path anchoring.
+const REPO_ROOT = loadSharedEnv();
 
 function num(v: string | undefined, fallback: number): number {
   const n = parseInt(v ?? '', 10);
@@ -16,8 +21,10 @@ export const config = {
   /** PTY-over-WS gateway port the phone connects to for CLOUD sessions. */
   ptyPort: num(process.env.WORKER_PTY_PORT, 4100),
 
-  /** Root of the synced file store; per-project subfolders bind-mount into containers. */
-  fileStoreRoot: resolve(process.env.FILE_STORE_ROOT ?? './.pocketdev-store'),
+  /** Root of the synced file store; per-project subfolders bind-mount into
+   *  containers. Anchored at the repo root so it resolves to the SAME directory
+   *  as the API regardless of each process's cwd. */
+  fileStoreRoot: resolve(REPO_ROOT, process.env.FILE_STORE_ROOT ?? './.pocketdev-store'),
 
   docker: {
     image: process.env.EXECUTION_IMAGE ?? 'node:22-bookworm-slim',

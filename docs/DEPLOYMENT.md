@@ -452,6 +452,17 @@ Source: [Always Free Resources doc](https://docs.oracle.com/en-us/iaas/Content/F
 
 ## Troubleshooting
 
+- **PTY session fails with `Unauthorized`** — the worker/desktop must use the
+  *same* `JWT_SECRET` as the API to verify the PTY token. They now auto-load
+  `server/.env`, so just make sure that file exists and is the one the API uses.
+  (Manual override if needed: launch the worker with `JWT_SECRET="…" pnpm worker:dev`.)
+- **`jq: command not found`** — not required; `scripts/pty-client.mjs` parses JSON
+  itself, and the curl examples work without it. To install: `winget install jqlang.jq`.
+- **Worker prints `AttachConsole failed … conpty_console_list_agent.js`** — a
+  harmless node-pty helper message on Windows when the worker runs detached; the
+  session still works (look for `job=N exit=0`). Does not occur on the Linux VM.
+- **CLI sync reports "0 files"** — `pnpm --filter … start sync ./x` resolves `./x`
+  relative to the *package* dir. Pass an **absolute path** to the folder you mean.
 - **`pnpm server:dev` → `Cannot find module …/server/dist/main`** — a stale
   TypeScript build-info made the compiler skip emitting. Fixed in-repo (removed
   `incremental`), but if it ever recurs: `rm -rf server/dist server/*.tsbuildinfo`
