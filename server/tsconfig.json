@@ -11,7 +11,6 @@
     "declaration": false,
     "declarationMap": false,
     "removeComments": true,
-    "incremental": true,
     "isolatedModules": false,
     "noUncheckedIndexedAccess": false,
     "strictPropertyInitialization": false

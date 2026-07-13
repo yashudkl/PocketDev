@@ -452,6 +452,19 @@ Source: [Always Free Resources doc](https://docs.oracle.com/en-us/iaas/Content/F
 
 ## Troubleshooting
 
+- **`pnpm server:dev` → `Cannot find module …/server/dist/main`** — a stale
+  TypeScript build-info made the compiler skip emitting. Fixed in-repo (removed
+  `incremental`), but if it ever recurs: `rm -rf server/dist server/*.tsbuildinfo`
+  then rebuild.
+- **Worker spams `[events] redis …` / can't reach Redis even though the container is "Up"** —
+  a stale `pocketdev-redis` container can run without publishing port 6379
+  (`docker port pocketdev-redis` shows nothing). Recreate it:
+  `docker compose up -d --force-recreate redis`. Verify: `docker port pocketdev-redis`
+  should show `6379/tcp -> 0.0.0.0:6379`.
+- **Container `/workspace` is empty when a command runs** — the server and worker
+  resolve `FILE_STORE_ROOT` relative to *their own* working directory, so the
+  defaults diverge. Set it to the **same absolute path** in both processes' env
+  (e.g. `FILE_STORE_ROOT=C:\dev\pocketdev\.store` locally, or `/home/ubuntu/store` on the VM).
 - **Worker logs "Docker not reachable"** — Docker daemon isn’t up, or your user isn’t in the `docker` group (`newgrp docker`).
 - **Session never streams** — the client must attach within `SESSION_CONNECT_TIMEOUT_S` (60 s); check the worker terminal for `session … started`.
 - **Port open in OCI but still unreachable** — the OS iptables REJECT rule (Part C4b). `sudo iptables -L INPUT --line-numbers`.

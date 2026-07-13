@@ -112,7 +112,12 @@ worker.on('completed', (job, result) =>
 worker.on('failed', (job, err) =>
   console.error(`[execution-worker] job=${job?.id} failed: ${err.message}`),
 );
-worker.on('error', (err) => console.error(`[execution-worker] worker error: ${err.message}`));
+worker.on('error', (err) =>
+  console.error(
+    `[execution-worker] worker error: ${err.message || (err as { code?: string }).code || 'unknown'}` +
+      ' (is Redis reachable? — docker compose up -d)',
+  ),
+);
 
 async function main(): Promise<void> {
   if (await pingDocker()) {
