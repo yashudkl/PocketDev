@@ -33,7 +33,8 @@
       "@prisma/client",
       "@prisma/engines",
       "prisma",
-      "esbuild"
+      "esbuild",
+      "node-pty"
     ]
   }
 }
