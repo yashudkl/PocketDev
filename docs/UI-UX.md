@@ -5,9 +5,11 @@ A planning doc for the React Native (Expo + expo-router + NativeWind) app. Focus
 opinions here against your own UX judgment. Everything maps to endpoints the backend
 already exposes.
 
-> Stack in place: Expo SDK 54, expo-router 6, React 19, NativeWind 4, React Query,
-> axios. Tokens already defined in `tailwind.config.js` (primary `#6C63FF`, neutral
-> scale, `surface.dark #1A1A1A`, radius + z-index scales). Build on those.
+> Stack in place: **Expo SDK 57** (React 19.2, RN 0.86), expo-router, NativeWind 4,
+> React Query, axios — plus the installed UI libs (react-native-webview, expo-secure-store,
+> reanimated 4 + worklets, @gorhom/bottom-sheet, expo-haptics, date-fns). Tokens in
+> `tailwind.config.js`: cyan/teal primary `#22D3EE`, semantic success/warning/danger/info,
+> dark-first surfaces (`#0D1117` / `#161B22`), neutral + radius + z-index scales. Build on those.
 
 ---
 
