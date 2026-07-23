@@ -11,7 +11,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.pocketdev.app",
+      "bundleIdentifier": "com.billjeshbaidya.pocketdev",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera.",
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos.",

@@ -72,7 +72,7 @@ The application identity is defined in `app.json`:
 
 - Display name: `PocketDev`
 - Slug and URL scheme: `pocketdev`
-- iOS bundle identifier: `com.pocketdev.app`
+- iOS bundle identifier: `com.billjeshbaidya.pocketdev`
 - Android application ID: `com.pocketdev.app`
 
 Native config plugins are registered for Router, image picking, secure storage,
