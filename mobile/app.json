@@ -3,6 +3,7 @@
     "name": "PocketDev",
     "slug": "pocketdev",
     "version": "0.1.0",
+    "icon": "./assets/images/pocketdev-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "pocketdev",
@@ -15,12 +16,12 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera.",
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos.",
-        "NSFaceIDUsageDescription": "Use Face ID to unlock your PocketDev session.",
+        "NSFaceIDUsageDescription": "Use Face ID to verify your identity in PocketDev.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.pocketdev.app",
+      "package": "com.billjeshbaidya.pocketdev",
       "permissions": []
     },
     "web": {
@@ -48,12 +49,20 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Use Face ID to unlock your PocketDev session."
+          "faceIDPermission": "Use Face ID to verify your identity in PocketDev."
         }
       ],
       "expo-font",
       "expo-image",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#070A0F",
+          "image": "./assets/images/pocketdev-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser",
       "expo-sharing",
@@ -62,15 +71,12 @@
         "llama.rn",
         {
           "enableEntitlements": true,
-          "entitlementsProfile": "production",
+          "entitlementsProfile": ["development", "preview", "production"],
           "forceCxx20": true,
           "enableOpenCLAndHexagon": true
         }
       ]
     ],
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
       "router": {},
       "eas": {

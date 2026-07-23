@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Put,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put, Query } from '@nestjs/common';
 import type { FileContent, FileNode, WriteFileResult } from '@pocketdev/shared';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { ProjectsService } from '../projects/projects.service';
@@ -52,7 +44,11 @@ export class FilesController {
     @Body() dto: WriteFileDto,
   ): Promise<WriteFileResult> {
     await this.projects.findOne(user.userId, projectId);
-    const size = await this.files.writeText(user.userId, projectId, dto.path, dto.content);
+    const size = await this.files.writeText(user.userId, projectId, dto.path, dto.content, {
+      createOnly: dto.createOnly,
+    });
+    const manifest = await this.files.computeManifest(user.userId, projectId);
+    await this.projects.updateManifest(user.userId, projectId, manifest);
     return { path: dto.path, size, written: true };
   }
 
@@ -64,6 +60,8 @@ export class FilesController {
   ): Promise<{ deleted: true }> {
     await this.projects.findOne(user.userId, projectId);
     await this.files.remove(user.userId, projectId, path);
+    const manifest = await this.files.computeManifest(user.userId, projectId);
+    await this.projects.updateManifest(user.userId, projectId, manifest);
     return { deleted: true };
   }
 }

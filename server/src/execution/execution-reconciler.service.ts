@@ -1,10 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  EXEC_EVENTS_CHANNEL,
-  EXECUTION_QUEUE,
-  type ExecutionEvent,
-} from '@pocketdev/shared';
+import { EXEC_EVENTS_CHANNEL, EXECUTION_QUEUE, type ExecutionEvent } from '@pocketdev/shared';
 import { QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
@@ -84,10 +80,15 @@ export class ExecutionReconciler implements OnModuleInit, OnModuleDestroy {
           break;
         case 'session-exited':
           await this.prisma.job
-            .update({
-              where: { id: event.jobId },
+            .updateMany({
+              where: { id: event.jobId, status: { in: ['QUEUED', 'RUNNING'] } },
               data: {
-                status: event.exitCode === 0 ? 'SUCCEEDED' : 'FAILED',
+                status:
+                  event.exitCode === 0
+                    ? 'SUCCEEDED'
+                    : event.exitCode === 130
+                      ? 'CANCELED'
+                      : 'FAILED',
                 exitCode: event.exitCode,
                 finishedAt: new Date(),
               },
@@ -97,8 +98,8 @@ export class ExecutionReconciler implements OnModuleInit, OnModuleDestroy {
           break;
         case 'session-error':
           await this.prisma.job
-            .update({
-              where: { id: event.jobId },
+            .updateMany({
+              where: { id: event.jobId, status: { in: ['QUEUED', 'RUNNING'] } },
               data: { status: 'FAILED', finishedAt: new Date() },
             })
             .catch(() => undefined);

@@ -28,14 +28,14 @@ export class DesktopService {
   async status(userId: string) {
     const presence = await this.prisma.desktopPresence.findUnique({ where: { userId } });
     const online =
-      !!presence?.online &&
-      Date.now() - presence.lastHeartbeat.getTime() < HEARTBEAT_WINDOW_MS;
+      !!presence?.online && Date.now() - presence.lastHeartbeat.getTime() < HEARTBEAT_WINDOW_MS;
+    const canRouteToDesktop = online && !!presence?.tunnelUrl;
     return {
       online,
-      tunnelUrl: online ? presence?.tunnelUrl ?? null : null,
+      tunnelUrl: canRouteToDesktop ? presence!.tunnelUrl : null,
       lastHeartbeat: presence?.lastHeartbeat ?? null,
       // Where a job would route right now (Decision 4).
-      target: online ? 'DESKTOP' : 'CLOUD',
+      target: canRouteToDesktop ? 'DESKTOP' : 'CLOUD',
     };
   }
 }

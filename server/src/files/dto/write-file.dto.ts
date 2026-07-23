@@ -1,4 +1,4 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class WriteFileDto {
   @IsString()
@@ -10,4 +10,8 @@ export class WriteFileDto {
   @IsString()
   @MaxLength(2 * 1024 * 1024)
   content!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  createOnly?: boolean;
 }

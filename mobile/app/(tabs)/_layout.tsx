@@ -1,23 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+import { colors } from '@/constants/theme';
+
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#A3A3A3',
+        sceneStyle: { backgroundColor: colors.background },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.subtle,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
+        },
         tabBarStyle: {
-          backgroundColor: '#171717',
-          borderTopColor: '#262626',
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 62,
+          paddingTop: 6,
         },
         tabBarIcon: ({ color, size }) => {
           const iconMap = {
-            home: 'home-outline',
-            explore: 'compass-outline',
-            notifications: 'notifications-outline',
-            profile: 'person-outline',
+            home: 'folder-open-outline',
+            explore: 'pulse-outline',
+            profile: 'settings-outline',
           } as const;
 
           return (
@@ -30,10 +39,9 @@ export default function TabsLayout() {
         },
       })}
     >
-      <Tabs.Screen name="home" options={{ title: 'Home' }} />
-      <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
-      <Tabs.Screen name="notifications" options={{ title: 'Alerts' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="home" options={{ title: 'Projects' }} />
+      <Tabs.Screen name="explore" options={{ title: 'Activity' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Settings' }} />
     </Tabs>
   );
 }

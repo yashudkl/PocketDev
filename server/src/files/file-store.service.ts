@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -53,18 +53,42 @@ export class FileStoreService {
     await fs.mkdir(dir, { recursive: true });
   }
 
-  /** Write (or overwrite) a file from a UTF-8 string. Returns bytes written. */
-  async writeText(userId: string, projectId: string, relPath: string, content: string): Promise<number> {
+  /** Write a UTF-8 file, optionally failing atomically when it already exists. */
+  async writeText(
+    userId: string,
+    projectId: string,
+    relPath: string,
+    content: string,
+    options: { createOnly?: boolean } = {},
+  ): Promise<number> {
     const projectRoot = this.projectDir(userId, projectId);
     const abs = this.safeResolve(projectRoot, relPath);
     await this.ensureDir(dirname(abs));
     const buf = Buffer.from(content, 'utf-8');
-    await fs.writeFile(abs, buf);
+    try {
+      await fs.writeFile(abs, buf, options.createOnly ? { flag: 'wx' } : undefined);
+    } catch (error) {
+      if (
+        options.createOnly &&
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'EEXIST'
+      ) {
+        throw new ConflictException(`File already exists: ${relPath}`);
+      }
+      throw error;
+    }
     return buf.byteLength;
   }
 
   /** Write (or overwrite) a file from base64 content (used by the sync gateway). */
-  async writeBase64(userId: string, projectId: string, relPath: string, base64: string): Promise<number> {
+  async writeBase64(
+    userId: string,
+    projectId: string,
+    relPath: string,
+    base64: string,
+  ): Promise<number> {
     const projectRoot = this.projectDir(userId, projectId);
     const abs = this.safeResolve(projectRoot, relPath);
     await this.ensureDir(dirname(abs));
@@ -74,7 +98,11 @@ export class FileStoreService {
   }
 
   /** Read a file as UTF-8 text; rejects oversized or binary files (editor use). */
-  async readText(userId: string, projectId: string, relPath: string): Promise<{ content: string; size: number }> {
+  async readText(
+    userId: string,
+    projectId: string,
+    relPath: string,
+  ): Promise<{ content: string; size: number }> {
     const projectRoot = this.projectDir(userId, projectId);
     const abs = this.safeResolve(projectRoot, relPath);
     let stat;
@@ -159,7 +187,11 @@ export class FileStoreService {
     return manifest;
   }
 
-  private async collectManifest(projectRoot: string, dir: string, out: FileManifest): Promise<void> {
+  private async collectManifest(
+    projectRoot: string,
+    dir: string,
+    out: FileManifest,
+  ): Promise<void> {
     let entries;
     try {
       entries = await fs.readdir(dir, { withFileTypes: true });
@@ -175,7 +207,9 @@ export class FileStoreService {
         const relPath = relative(projectRoot, abs).split(sep).join('/');
         try {
           const stat = await fs.stat(abs);
-          const hash = createHash('sha256').update(await fs.readFile(abs)).digest('hex');
+          const hash = createHash('sha256')
+            .update(await fs.readFile(abs))
+            .digest('hex');
           out[relPath] = { path: relPath, size: stat.size, mtimeMs: stat.mtimeMs, hash };
         } catch {
           /* ignore unreadable files */

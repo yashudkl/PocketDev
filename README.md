@@ -94,9 +94,11 @@ pnpm mobile:dev      # Expo dev server
 
 ## Status
 
-The **backend is built end-to-end** (everything except the mobile app UI and the
-on-device LLM, which lives on the phone). All six workspaces build and type-check,
-and the unit tests pass.
+The backend and the native mobile client are implemented end-to-end. The Expo app
+now covers authentication, projects, files, editing, terminal sessions, activity,
+Git, account/runtime settings, and optional on-device GGUF explanations. See the
+[mobile guide](./mobile/README.md) for setup, EAS builds, and current workflow
+constraints.
 
 | Area | State |
 |---|---|
@@ -110,7 +112,7 @@ and the unit tests pass.
 | Git from the phone (status/commit/push/…) | ✅ `/projects/:id/git/*` (simple-git) |
 | Execution-status reconciliation (worker → Redis → DB) | ✅ `ExecutionReconciler` (worker never touches the DB) |
 | Queue dashboard | ✅ Bull Board at `/admin/queues` (basic-auth) |
-| Mobile app UI · on-device LLM | ⏳ out of scope for this backend pass |
+| Mobile app UI · on-device LLM | ✅ Expo/NativeWind client + optional imported GGUF model |
 
 **Architecture note:** the execution worker (the untrusted-code blast radius) never
 touches Postgres. It publishes lifecycle events on Redis; the API reconciles them into

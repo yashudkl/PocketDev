@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { FileManifest } from '@pocketdev/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 
@@ -11,6 +12,17 @@ export class ProjectsService {
     return this.prisma.project.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
+      // File manifests can grow large; list cards only need project metadata.
+      select: {
+        id: true,
+        userId: true,
+        name: true,
+        slug: true,
+        description: true,
+        lastSyncedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 
@@ -44,11 +56,16 @@ export class ProjectsService {
   }
 
   /** Updates the JSONB file manifest after a CLI sync (Decision 1: JSONB column). */
-  async updateManifest(userId: string, id: string, manifest: Prisma.InputJsonValue) {
+  async updateManifest(userId: string, id: string, manifest: FileManifest) {
     await this.findOne(userId, id);
     return this.prisma.project.update({
       where: { id },
-      data: { manifest, lastSyncedAt: new Date() },
+      // FileManifest contains only JSON primitives, but Prisma's generated
+      // InputJsonValue cannot structurally recognize its nested interfaces.
+      data: {
+        manifest: manifest as unknown as Prisma.InputJsonValue,
+        lastSyncedAt: new Date(),
+      },
     });
   }
 

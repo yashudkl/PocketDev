@@ -3,6 +3,8 @@ module.exports = {
   content: [
     './app/**/*.{js,jsx,ts,tsx}',
     './components/**/*.{js,jsx,ts,tsx}',
+    './providers/**/*.{js,jsx,ts,tsx}',
+    './features/**/*.{js,jsx,ts,tsx}',
   ],
   presets: [require('nativewind/preset')],
   theme: {
@@ -25,7 +27,7 @@ module.exports = {
         // Semantic status — wire StatusChip / online dots / exit codes to these.
         success: { DEFAULT: '#22C55E', light: '#4ADE80', dark: '#15803D' }, // running / online / exit 0
         warning: { DEFAULT: '#F59E0B', light: '#FBBF24', dark: '#B45309' }, // queued / dirty
-        danger: { DEFAULT: '#EF4444', light: '#F87171', dark: '#B91C1C' },  // failed / exit != 0
+        danger: { DEFAULT: '#EF4444', light: '#F87171', dark: '#B91C1C' }, // failed / exit != 0
         info: { DEFAULT: '#3B82F6', light: '#60A5FA', dark: '#1D4ED8' },
         neutral: {
           50: '#FAFAFA',

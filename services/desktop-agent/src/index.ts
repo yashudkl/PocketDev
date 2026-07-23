@@ -41,18 +41,22 @@ const gateway = createPtyGateway({
     };
   },
 
-  onSessionExit: (_claims, ctx) => {
-    // Best-effort: tell the API the desktop session ended so it's marked CLOSED.
-    void closeSession(ctx.sessionId);
+  onSessionExit: (_claims, ctx, exitCode) => {
+    // Best-effort: persist the desktop command's real outcome in the API.
+    void completeSession(ctx.sessionId, exitCode);
   },
 });
 
-async function closeSession(sessionId: string): Promise<void> {
+async function completeSession(sessionId: string, exitCode: number): Promise<void> {
   if (!config.token) return;
   try {
-    await fetch(`${config.apiUrl}/sessions/${sessionId}/close`, {
+    await fetch(`${config.apiUrl}/sessions/${sessionId}/complete`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${config.token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.token}`,
+      },
+      body: JSON.stringify({ exitCode }),
     });
   } catch {
     /* offline — the server's TTL/heartbeat window will reconcile */

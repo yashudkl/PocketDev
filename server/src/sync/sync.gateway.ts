@@ -197,7 +197,7 @@ export class SyncGateway implements OnModuleInit, OnModuleDestroy {
     // Persist the post-sync manifest to the JSONB column (Decision 1) so the
     // next sync only transfers deltas.
     const manifest = conn.pendingManifest ?? {};
-    await this.projects.updateManifest(conn.userId, projectId, manifest as object);
+    await this.projects.updateManifest(conn.userId, projectId, manifest);
     this.send(ws, { type: 'synced', projectId });
   }
 }

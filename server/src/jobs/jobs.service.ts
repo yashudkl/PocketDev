@@ -48,7 +48,7 @@ export class JobsService {
    * - Decision 4 routing: run on the developer's desktop if its agent is online
    *   AND advertised a tunnel URL, otherwise fall back to the cloud worker.
    */
-  async create(userId: string, tier: string, dto: CreateJobDto): Promise<StartSessionResponse> {
+  async create(userId: string, dto: CreateJobDto): Promise<StartSessionResponse> {
     const project = await this.prisma.project.findUnique({ where: { id: dto.projectId } });
     if (!project || project.userId !== userId) {
       throw new NotFoundException('Project not found');
@@ -79,7 +79,14 @@ export class JobsService {
     const wsToken = this.mintPtyToken(userId, session.id, dto.projectId);
 
     if (route.target === ExecutionTarget.CLOUD) {
-      const isPaid = tier === Tier.PAID;
+      // Read the current database tier instead of trusting the JWT claim. Demo
+      // upgrades take effect immediately without forcing the mobile app to log
+      // out and obtain a new token.
+      const currentUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { tier: true },
+      });
+      const isPaid = currentUser?.tier === Tier.PAID;
       const queued = await this.queue.add(
         RUN_COMMAND_JOB,
         {
@@ -127,8 +134,7 @@ export class JobsService {
     userId: string,
   ): Promise<{ target: ExecutionTarget; tunnelUrl?: string }> {
     const presence = await this.prisma.desktopPresence.findUnique({ where: { userId } });
-    const windowMs =
-      this.config.get<number>('execution.desktopHeartbeatWindowMs') ?? 30_000;
+    const windowMs = this.config.get<number>('execution.desktopHeartbeatWindowMs') ?? 30_000;
     const fresh =
       !!presence?.online &&
       !!presence.tunnelUrl &&

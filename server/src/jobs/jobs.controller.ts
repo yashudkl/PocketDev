@@ -14,7 +14,7 @@ export class JobsController {
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateJobDto) {
-    return this.jobs.create(user.userId, user.tier, dto);
+    return this.jobs.create(user.userId, dto);
   }
 
   @Get(':id')
