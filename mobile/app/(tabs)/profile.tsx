@@ -12,16 +12,15 @@ export default function ProfileScreen() {
         </View>
         <Text className="text-xl font-bold text-neutral-900">Profile</Text>
         <Text className="text-center text-sm text-neutral-400">
-          Use this screen for account details, settings, or any other profile-related UI
-          in your project.
+          Manage your PocketDev account, development environments, and app settings.
         </Text>
       </View>
 
       <View className="mt-8 rounded-2xl bg-neutral-50 p-4">
-        <Text className="text-sm font-semibold text-neutral-700">Template note</Text>
+        <Text className="text-sm font-semibold text-neutral-700">PocketDev</Text>
         <Text className="mt-2 text-sm leading-6 text-neutral-500">
-          This starter does not include authentication by default. Add your own auth flow,
-          API wiring, and persisted session handling if your app needs them.
+          Your mobile workspace for browsing, editing, running, and committing code from
+          anywhere.
         </Text>
       </View>
     </View>

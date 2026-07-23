@@ -1,87 +1,111 @@
-# Expo NativeWind Template
+# PocketDev Mobile
 
-A reusable Expo starter with a simple tab app shell and a neutral default setup that does not assume your branding, backend, or Expo account.
+The Expo mobile client for PocketDev, a mobile-native cloud development environment.
 
 ## Stack
 
-- Expo SDK 54
-- Expo Router v6
-- NativeWind v4
-- TanStack Query v5
-- Axios
-- Expo Image Picker
-- React Native Toast Message
-- React Native SVG Transformer
+- Expo SDK 57 and React Native 0.86
+- Expo Router
+- Expo development client
+- NativeWind
+- TanStack Query and Axios
+- Expo notifications, image picker, secure store, and haptics
+- `llama.rn` with Metal-enabled iOS entitlements for on-device error help
 
-## Quick Start
+## Requirements
 
-```bash
-npm install
-cp .env.example .env
-npm run dev
-```
+- Node.js 20 or newer
+- pnpm 10.28.2
+- An Expo account with access to EAS project
+  `353633f1-556d-46a1-9a50-cb14d6e45e7f`
+- For a physical iPhone development build, an Apple Developer account and a
+  registered device
 
-On Windows PowerShell, use `cmd /c` if script execution is blocked:
-
-```powershell
-cmd /c npm install
-cmd /c copy .env.example .env
-cmd /c npm run dev
-```
-
-## Template Defaults
-
-- The app opens into `/(tabs)/home` after a short loading state in `app/index.tsx`.
-- The project does not include authentication or persisted session handling by default.
-- `app.json` does not include an EAS project ID or OTA updates URL.
-- No app icons or splash assets are wired by default.
-
-## Environment
-
-Create a `.env` file from `.env.example` and set:
+Install dependencies from the repository root:
 
 ```bash
-EXPO_PUBLIC_API_URL=https://api.example.com
+pnpm install
 ```
 
-The shared Axios client in `api/axios.ts` fails fast when `EXPO_PUBLIC_API_URL` is missing, so fresh clones do not silently call a fake placeholder backend.
+Copy the environment template and set the backend URL:
 
-## Project Structure
+```bash
+cp mobile/.env.example mobile/.env
+```
+
+For a physical iPhone, `EXPO_PUBLIC_API_URL` must be an HTTPS endpoint or a LAN
+address reachable from the phone. `localhost` points to the phone itself.
+
+## Development
+
+Start Metro for the development client:
+
+```bash
+pnpm mobile:dev
+```
+
+Build the iOS development client:
+
+```bash
+pnpm exec eas build --platform ios --profile development
+```
+
+The `development` profile creates an internal-distribution development client.
+Because native modules are compiled into this client, rerun the EAS build after
+adding or changing a package with native iOS code or an Expo config plugin.
+JavaScript-only dependency changes generally do not require rebuilding it.
+
+## Pre-build checks
+
+Run these from `mobile/` before submitting an EAS build:
+
+```bash
+pnpm exec expo install --check
+pnpm dlx expo-doctor@latest
+pnpm run typecheck
+pnpm run lint
+```
+
+## App configuration
+
+The application identity is defined in `app.json`:
+
+- Display name: `PocketDev`
+- Slug and URL scheme: `pocketdev`
+- iOS bundle identifier: `com.pocketdev.app`
+- Android application ID: `com.pocketdev.app`
+
+Native config plugins are registered for Router, image picking, secure storage,
+notifications, Files app access, Face ID, fonts, images, splash screen, sharing,
+updates, and `llama.rn`.
+
+## Dependency audit
+
+The mobile dependencies cover the backend and demo scope:
+
+- Auth and API state: React Hook Form, Zod, Axios, TanStack Query, secure storage,
+  AsyncStorage, and Zustand
+- File editing and Git: document picker, file system, clipboard, sharing, SVG,
+  WebView, and `diff`
+- Terminal: React Native WebSocket, WebView, xterm.js, keyboard controller,
+  keep-awake, NetInfo, and haptics
+- On-device assistance: `llama.rn`, file system, and crypto checksums for
+  downloaded GGUF models
+- App lifecycle: development client, notifications, device/application metadata,
+  and EAS Updates
+
+React Native provides the raw WebSocket client, so a Node `ws` package or
+Socket.IO client is not needed. The backend uses raw WebSocket protocols.
+
+## Project structure
 
 ```text
-app/
-  _layout.tsx
-  index.tsx
-  +not-found.tsx
-  (tabs)/
-    _layout.tsx
-    home.tsx
-    explore.tsx
-    notifications.tsx
-    profile.tsx
-api/
-  axios.ts
-components/
-lib/
-assets/
-global.css
-tailwind.config.js
-babel.config.js
-metro.config.js
-app.json
-eas.json
+mobile/
+  app/             Expo Router screens and layouts
+  api/             HTTP client
+  components/      Shared UI
+  lib/             Shared client configuration
+  types/           Asset type declarations
+  app.json         Expo and native application configuration
+  eas.json         EAS build profiles
 ```
-
-## Customize Before Shipping
-
-- Update the app identity fields in `app.json`.
-- Replace the default color palette in `tailwind.config.js`.
-- Add your own icons and splash assets, then reference them in `app.json`.
-- Expand `api/axios.ts` with auth headers, interceptors, or other API behavior if your app needs them.
-- Run `eas init` when you are ready to connect the app to your own Expo account and project.
-
-## Notes
-
-- `expo-router`, `nativewind`, and the SVG transformer are already configured.
-- TanStack Query is wired at the app root so you can add server-state hooks without more setup.
-- Toast support is already mounted in the root layout.
