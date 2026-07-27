@@ -52,12 +52,19 @@ export default function TerminalScreen() {
     autorun?: string;
   }>();
   const projectId = param(params.projectId);
-  const initialCommand = param(params.command) || 'npm test';
+  const initialCommand = param(params.command) || 'npm run';
   const [command, setCommand] = useState(initialCommand);
-  const [explanationVisible, setExplanationVisible] = useState(false);
+  const [explanationRequest, setExplanationRequest] = useState<{
+    command: string;
+    output: string;
+    exitCode?: number;
+  } | null>(null);
   const autoStarted = useRef(false);
   const outputRef = useRef<ScrollView>(null);
   const terminal = useTerminalSession(projectId);
+  const active = ['creating', 'connecting', 'waiting', 'ready', 'stopping'].includes(
+    terminal.phase,
+  );
 
   const projectQuery = useQuery({
     queryKey: ['projects', projectId],
@@ -67,7 +74,10 @@ export default function TerminalScreen() {
     queryKey: ['jobs', terminal.launch?.jobId],
     queryFn: () => jobsApi.get(terminal.launch!.jobId),
     enabled: Boolean(terminal.launch?.jobId),
-    refetchInterval: terminal.phase === 'waiting' ? 2_000 : false,
+    refetchInterval: (query) => {
+      const status = (query.state.data as { status?: string } | undefined)?.status;
+      return active || status === 'QUEUED' || status === 'RUNNING' ? 2_000 : false;
+    },
   });
 
   useEffect(() => {
@@ -83,9 +93,27 @@ export default function TerminalScreen() {
     }
   }, [terminal.output]);
 
-  const active = ['creating', 'connecting', 'waiting', 'ready', 'stopping'].includes(
-    terminal.phase,
-  );
+  const displayedJobStatus =
+    terminal.phase === 'exited'
+      ? terminal.exitCode === null
+        ? 'CANCELED'
+        : terminal.exitCode === 0
+          ? 'SUCCEEDED'
+          : 'FAILED'
+      : jobQuery.data?.status;
+  const sessionDirectory = terminal.launch
+    ? terminal.launch.target === 'DESKTOP'
+      ? (projectQuery.data?.desktopPath ?? 'Connected desktop project')
+      : '/workspace'
+    : null;
+  const explainCurrentOutput = () => {
+    if (!terminal.output.trim()) return;
+    setExplanationRequest({
+      command: terminal.lastCommand || command,
+      output: terminal.output,
+      exitCode: terminal.exitCode ?? undefined,
+    });
+  };
 
   return (
     <Screen keyboard edges={['top', 'left', 'right', 'bottom']}>
@@ -101,8 +129,8 @@ export default function TerminalScreen() {
           <View>
             <AppText variant="title">Run anything</AppText>
             <AppText variant="caption" className="mt-1 leading-5">
-              The backend routes this command to your desktop when connected, otherwise to the cloud
-              worker.
+              Starts an interactive shell on your desktop or the cloud, runs this first command, and
+              keeps the terminal open for the next command.
             </AppText>
           </View>
           <Input
@@ -116,7 +144,7 @@ export default function TerminalScreen() {
             onSubmitEditing={() => void terminal.start(command)}
           />
           <View className="flex-row flex-wrap gap-2">
-            {['npm test', 'npm run build', 'git status', 'ls -la'].map((preset) => (
+            {['npm run', 'npm test', 'git status', 'node --version'].map((preset) => (
               <AppText
                 key={preset}
                 onPress={() => setCommand(preset)}
@@ -140,26 +168,38 @@ export default function TerminalScreen() {
         <>
           <View className="flex-row items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
             <View className="min-w-0 flex-1">
-              <AppText variant="mono" className="text-xs text-cyan-300" numberOfLines={1}>
-                $ {command}
+              <AppText className="text-[11px] text-slate-500">Session starts in</AppText>
+              <AppText variant="mono" className="text-xs text-cyan-300" numberOfLines={2}>
+                {sessionDirectory ?? 'Resolving workspace…'}
               </AppText>
-              {jobQuery.data ? (
+              {displayedJobStatus ? (
                 <AppText className="mt-0.5 text-[11px] text-slate-600">
-                  {jobQuery.data.status} · {terminal.launch?.target}
+                  {displayedJobStatus} · {terminal.launch?.target} · last: {terminal.lastCommand}
                 </AppText>
               ) : null}
             </View>
-            {active ? (
-              <Button
-                label="End"
-                variant="danger"
-                size="sm"
-                loading={terminal.phase === 'stopping'}
-                onPress={() => void terminal.stop()}
-              />
-            ) : (
-              <Button label="Run again" variant="secondary" size="sm" onPress={terminal.reset} />
-            )}
+            <View className="flex-row gap-2">
+              {terminal.output.trim() ? (
+                <Button
+                  label="Ask AI"
+                  variant="secondary"
+                  size="sm"
+                  icon="sparkles-outline"
+                  onPress={explainCurrentOutput}
+                />
+              ) : null}
+              {active ? (
+                <Button
+                  label="End"
+                  variant="danger"
+                  size="sm"
+                  loading={terminal.phase === 'stopping'}
+                  onPress={() => void terminal.stop()}
+                />
+              ) : (
+                <Button label="New" variant="secondary" size="sm" onPress={terminal.reset} />
+              )}
+            </View>
           </View>
 
           {terminal.error ? (
@@ -182,16 +222,10 @@ export default function TerminalScreen() {
                     terminal.exitCode === 0 ? 'text-sm text-green-300' : 'text-sm text-red-300'
                   }
                 >
-                  Process exited with code {terminal.exitCode}
+                  Terminal exited with code {terminal.exitCode}
                 </AppText>
                 {terminal.exitCode !== 0 ? (
-                  <Button
-                    label="Explain locally"
-                    variant="ghost"
-                    size="sm"
-                    icon="sparkles-outline"
-                    onPress={() => setExplanationVisible(true)}
-                  />
+                  <AppText variant="caption">Use Ask AI above for help.</AppText>
                 ) : null}
               </View>
             </View>
@@ -206,14 +240,16 @@ export default function TerminalScreen() {
                 : 'Connecting to terminal…'
             }
           />
-          <TerminalInput disabled={terminal.phase !== 'ready'} onSend={terminal.sendInput} />
-          {terminal.exitCode !== null && terminal.exitCode !== 0 && explanationVisible ? (
+          {active ? (
+            <TerminalInput disabled={terminal.phase !== 'ready'} onSend={terminal.sendInput} />
+          ) : null}
+          {explanationRequest ? (
             <ExplanationModal
               visible
-              command={command}
-              output={terminal.output}
-              exitCode={terminal.exitCode}
-              onClose={() => setExplanationVisible(false)}
+              command={explanationRequest.command}
+              output={explanationRequest.output}
+              exitCode={explanationRequest.exitCode}
+              onClose={() => setExplanationRequest(null)}
             />
           ) : null}
         </>

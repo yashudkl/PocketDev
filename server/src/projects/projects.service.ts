@@ -19,6 +19,8 @@ export class ProjectsService {
         name: true,
         slug: true,
         description: true,
+        desktopPath: true,
+        desktopLinkedAt: true,
         lastSyncedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -53,6 +55,17 @@ export class ProjectsService {
     await this.findOne(userId, id);
     await this.prisma.project.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  async linkDesktop(userId: string, id: string, desktopPath: string) {
+    await this.findOne(userId, id);
+    return this.prisma.project.update({
+      where: { id },
+      data: {
+        desktopPath: desktopPath.trim(),
+        desktopLinkedAt: new Date(),
+      },
+    });
   }
 
   /** Updates the JSONB file manifest after a CLI sync (Decision 1: JSONB column). */

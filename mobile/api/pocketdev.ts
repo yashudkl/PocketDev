@@ -1,10 +1,12 @@
 import type {
+  DesktopDirectoryListing,
   FileContent,
   FileNode,
   GitBranchInfo,
   GitCommitResult,
   GitDiffResult,
   GitLogEntry,
+  GitPushProgress,
   GitStatusResult,
   StartSessionResponse,
   WriteFileResult,
@@ -98,8 +100,27 @@ export const sessionsApi = {
       .data,
 };
 
+export const assistantApi = {
+  explainTerminalFailure: async (input: { command: string; output: string; exitCode?: number }) =>
+    (
+      await apiClient.post<{ explanation: string; model: string }>(
+        '/assistant/explain-terminal',
+        input,
+        { timeout: SLOW_REQUEST_TIMEOUT_MS },
+      )
+    ).data,
+};
+
 export const desktopApi = {
   status: async () => (await apiClient.get<DesktopStatus>('/desktop/status')).data,
+  browse: async (path?: string) =>
+    (
+      await apiClient.get<DesktopDirectoryListing>('/desktop/browse', {
+        params: path ? { path } : undefined,
+      })
+    ).data,
+  link: async (projectId: string, path: string) =>
+    (await apiClient.post<Project>('/desktop/link', { projectId, path })).data,
 };
 
 export const billingApi = {
@@ -146,6 +167,19 @@ export const gitApi = {
         undefined,
         { timeout: GIT_NETWORK_TIMEOUT_MS },
       )
+    ).data,
+  startPush: async (projectId: string) =>
+    (
+      await apiClient.post<GitPushProgress>(gitPath(projectId, 'push/start'), undefined, {
+        timeout: SLOW_REQUEST_TIMEOUT_MS,
+      })
+    ).data,
+  pushProgress: async (projectId: string, operationId: string) =>
+    (
+      await apiClient.get<GitPushProgress>(gitPath(projectId, 'push/progress'), {
+        params: { operationId },
+        timeout: SLOW_REQUEST_TIMEOUT_MS,
+      })
     ).data,
   pull: async (projectId: string) =>
     (

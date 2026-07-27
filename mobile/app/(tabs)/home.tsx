@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { FlatList, RefreshControl, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-import { projectsApi } from '@/api/pocketdev';
+import { desktopApi, projectsApi } from '@/api/pocketdev';
 import {
   CreateProjectModal,
   type CreateProjectValues,
 } from '@/components/projects/CreateProjectModal';
+import { NewProjectModal } from '@/components/projects/NewProjectModal';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { AppText } from '@/components/ui/AppText';
@@ -21,6 +22,7 @@ import { getErrorMessage } from '@/utils/errors';
 
 export default function ProjectsScreen() {
   const queryClient = useQueryClient();
+  const [newOpen, setNewOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
   const projectsQuery = useQuery({
@@ -45,6 +47,35 @@ export default function ProjectsScreen() {
     },
   });
 
+  const linkDesktopMutation = useMutation({
+    mutationFn: async ({ name, path }: { name: string; path: string }) => {
+      const project = await projectsApi.create({ name: name.slice(0, 80) });
+      try {
+        return await desktopApi.link(project.id, path);
+      } catch (error) {
+        await projectsApi.remove(project.id).catch(() => undefined);
+        throw error;
+      }
+    },
+    onSuccess: (project) => {
+      queryClient.setQueryData<Project[]>(['projects'], (projects = []) => [
+        project,
+        ...projects.filter((item) => item.id !== project.id),
+      ]);
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void queryClient.invalidateQueries({ queryKey: ['desktop-status'] });
+      void queryClient.invalidateQueries({ queryKey: ['files', project.id] });
+      void queryClient.invalidateQueries({ queryKey: ['git', project.id] });
+      setNewOpen(false);
+      Toast.show({
+        type: 'success',
+        text1: 'Desktop project linked',
+        text2: `${project.name} now opens from ${project.desktopPath}.`,
+      });
+      router.push(`/projects/${encodeURIComponent(project.id)}` as Href);
+    },
+  });
+
   const projects = projectsQuery.data ?? [];
   const projectCountLabel = projectsQuery.isSuccess
     ? `${projects.length} ${projects.length === 1 ? 'project' : 'projects'}`
@@ -55,7 +86,7 @@ export default function ProjectsScreen() {
       <AppHeader
         title="Projects"
         subtitle={projectCountLabel}
-        right={<Button label="New" icon="add" size="sm" onPress={() => setCreateOpen(true)} />}
+        right={<Button label="New" icon="add" size="sm" onPress={() => setNewOpen(true)} />}
       />
 
       {projectsQuery.isLoading ? (
@@ -105,15 +136,22 @@ export default function ProjectsScreen() {
             <View className="flex-1 justify-center">
               <EmptyState
                 icon="folder-open-outline"
-                title="Create your first project"
-                description="Projects keep your files, terminal sessions, and Git workflow together."
+                title="Add your first project"
+                description="Link a folder from your connected desktop or create a blank workspace."
                 actionLabel="New project"
-                onAction={() => setCreateOpen(true)}
+                onAction={() => setNewOpen(true)}
               />
             </View>
           }
         />
       )}
+
+      <NewProjectModal
+        visible={newOpen}
+        onClose={() => setNewOpen(false)}
+        onCreateBlank={() => setCreateOpen(true)}
+        onSelectDesktopFolder={(selection) => linkDesktopMutation.mutateAsync(selection)}
+      />
 
       <CreateProjectModal
         visible={createOpen}

@@ -3,12 +3,21 @@ import type { PtyHandle, SpawnSpec } from './types';
 
 /** Wrap node-pty into the runner-agnostic PtyHandle interface. */
 export function spawnPty(spec: SpawnSpec): PtyHandle {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
+  );
+  for (const [name, value] of Object.entries(spec.env ?? {})) {
+    if (value === undefined) delete env[name];
+    else env[name] = value;
+  }
   const proc: IPty = ptySpawn(spec.command, spec.args, {
     name: 'xterm-256color',
     cols: spec.cols ?? 80,
     rows: spec.rows ?? 24,
     cwd: spec.cwd ?? process.cwd(),
-    env: { ...process.env, ...spec.env } as Record<string, string>,
+    env,
   });
 
   return {

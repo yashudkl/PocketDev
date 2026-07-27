@@ -63,10 +63,7 @@ export class SyncGateway implements OnModuleInit, OnModuleDestroy {
   private handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const { pathname, token } = this.parseUrl(req);
     if (pathname !== SYNC_PATH) {
-      // /sync is the only WebSocket on this HTTP server — reject anything else
-      // rather than leaving the upgrade socket dangling.
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
+      // Other modules can own WebSocket paths on the same Nest HTTP server.
       return;
     }
     const userId = this.verify(token);

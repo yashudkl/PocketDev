@@ -15,7 +15,12 @@ export function ProjectSummary({
   project: Project;
   desktop?: DesktopStatus;
 }) {
-  const desktopReady = Boolean(desktop?.online && desktop.tunnelUrl);
+  const desktopReady = Boolean(
+    desktop?.online &&
+    desktop.tunnelUrl &&
+    (desktop.projects?.some((link) => link.projectId === project.id) ||
+      desktop.projectId === project.id),
+  );
 
   return (
     <Card className="gap-4">
@@ -44,10 +49,19 @@ export function ProjectSummary({
         </AppText>
       ) : null}
 
+      {project.desktopPath ? (
+        <View className="rounded-xl bg-slate-800/70 px-3 py-2">
+          <AppText variant="caption">Linked desktop folder</AppText>
+          <AppText variant="mono" className="mt-1 text-xs text-cyan-300" numberOfLines={2}>
+            {project.desktopPath}
+          </AppText>
+        </View>
+      ) : null}
+
       <View className="flex-row items-center justify-between border-t border-slate-800 pt-3">
-        <AppText variant="caption">Last synced</AppText>
+        <AppText variant="caption">{desktopReady ? 'Workspace access' : 'Last synced'}</AppText>
         <AppText className="text-sm font-medium text-slate-300">
-          {formatRelativeDate(project.lastSyncedAt)}
+          {desktopReady ? 'Live from desktop' : formatRelativeDate(project.lastSyncedAt)}
         </AppText>
       </View>
     </Card>

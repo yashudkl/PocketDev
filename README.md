@@ -36,7 +36,7 @@ Everything is **TypeScript**. Choices and their rationale are argued in full in
 | Terminal streaming | node-pty → WebSocket → xterm.js / RN terminal | Standard, battle-tested pattern; flow-control to avoid buffer drops. |
 | File sync | CLI agent: chokidar + delta hashing over WebSocket | Low-CPU `fs.watch`; rsync-style delta transfer (mtime + size + hash). |
 | Local desktop runtime | Cloudflare Tunnel (demo) / Tailscale · Headscale (prod) | Outbound-only, NAT/CGNAT traversal, no port forwarding, native WebSocket. |
-| On-device LLM | llama.rn (llama.cpp) + GGUF **Q4_K_M** model | Explains failed commands on-device, offline — independent of backend scale. |
+| AI explanations | Server-side OpenAI-compatible provider; optional llama.rn + GGUF | Works automatically without shipping API keys to phones, while keeping opt-in offline inference available. |
 | Container isolation | Hardened Docker + **gVisor** (`runsc`) demo; Firecracker / Kata (prod) | Docker alone is not a security boundary for untrusted code. |
 | Reverse proxy / TLS | Caddy | Automatic Let's Encrypt, WebSocket passthrough, lowest friction. |
 | Demo host | Oracle Cloud Always Free **ARM** (2 OCPU / 12 GB) | Free ARM tier; fallback Hetzner or Oracle PAYG. |
@@ -157,3 +157,14 @@ curl -s localhost:3000/jobs -H "authorization: Bearer $TOKEN" \
 For the desktop-runtime path, run `pnpm --filter @pocketdev/desktop-agent start` with
 `POCKETDEV_TOKEN` + `JWT_SECRET` set, expose it via `cloudflared`, and `POCKETDEV_TUNNEL_URL`
 will make the API route that user's sessions to the desktop instead of the cloud.
+
+For on-demand explanations of terminal output, warnings, and errors, add an
+OpenRouter key to `server/.env`:
+
+```dotenv
+OPENROUTER_API_KEY=sk-or-v1-...
+AI_MODEL=meta-llama/llama-3.3-70b-instruct
+```
+
+The mobile app calls the authenticated backend endpoint and never receives the
+provider key. `GROQ_API_KEY` is also supported as a zero-code alternative.

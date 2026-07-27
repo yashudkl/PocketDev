@@ -17,6 +17,7 @@ import { FilesModule } from './files/files.module';
 import { SyncModule } from './sync/sync.module';
 import { GitModule } from './git/git.module';
 import { ExecutionModule } from './execution/execution.module';
+import { AssistantModule } from './assistant/assistant.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ExecutionModule } from './execution/execution.module';
     SyncModule,
     GitModule,
     ExecutionModule,
+    AssistantModule,
   ],
   providers: [
     // JWT required by default; opt out per-route with @Public().

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shellArgs } from '../services/desktop-agent/src/config';
+import { shellArgs, terminalEnvironment } from '../services/desktop-agent/src/config';
 
 describe('shellArgs (desktop host runner, cross-OS)', () => {
   it('runs a command in a POSIX login shell', () => {
@@ -25,5 +25,20 @@ describe('shellArgs (desktop host runner, cross-OS)', () => {
 
   it('treats a blank command as interactive', () => {
     expect(shellArgs('bash', '   ')).toEqual(['-l']);
+  });
+
+  it('removes pnpm-only npm settings from child terminal commands', () => {
+    expect(
+      terminalEnvironment({
+        npm_config_auto_install_peers: 'true',
+        npm_config_registry: 'https://registry.npmjs.org/',
+        FORCE_COLOR: '1',
+      }),
+    ).toEqual({
+      NO_COLOR: '1',
+      FORCE_COLOR: undefined,
+      npm_config_color: 'false',
+      npm_config_auto_install_peers: undefined,
+    });
   });
 });

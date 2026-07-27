@@ -24,7 +24,7 @@ export default function ProjectWorkspaceScreen() {
   const { projectId: rawProjectId } = useLocalSearchParams<{ projectId: string }>();
   const projectId = param(rawProjectId);
   const queryClient = useQueryClient();
-  const [command, setCommand] = useState('npm test');
+  const [command, setCommand] = useState('npm run');
 
   const projectQuery = useQuery({
     queryKey: ['projects', projectId],
@@ -127,7 +127,7 @@ export default function ProjectWorkspaceScreen() {
       <Card>
         <AppText variant="heading">Run a command</AppText>
         <AppText variant="caption" className="mt-1 leading-5">
-          Starts a real PTY on your connected desktop or the cloud worker.
+          Starts a persistent interactive shell, runs this first command, and stays open for more.
         </AppText>
         <Input
           label="Command"
@@ -173,6 +173,16 @@ export default function ProjectWorkspaceScreen() {
           <AppText variant="caption">Project ID</AppText>
           <AppText variant="mono" className="max-w-[65%] text-xs text-slate-400" numberOfLines={1}>
             {project.id}
+          </AppText>
+        </View>
+        <View className="mt-2 flex-row justify-between gap-4">
+          <AppText variant="caption">Desktop link</AppText>
+          <AppText
+            variant="mono"
+            className="max-w-[65%] text-right text-xs text-slate-400"
+            numberOfLines={2}
+          >
+            {project.desktopPath ?? 'Not linked'}
           </AppText>
         </View>
       </Card>

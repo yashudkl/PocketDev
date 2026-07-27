@@ -1,4 +1,4 @@
-import type { IncomingMessage } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { PtyClientMessage, PtyServerMessage, PtyTokenClaims } from '@pocketdev/shared';
 import { spawnPty } from './spawn';
@@ -30,23 +30,39 @@ interface Conn {
  */
 export function createPtyGateway(opts: PtyGatewayOptions): PtyGateway {
   const log = opts.logger ?? (() => undefined);
+  const server = createServer((request, response) => {
+    if (!opts.handleHttpRequest) {
+      response.writeHead(404).end();
+      return;
+    }
+    void Promise.resolve(opts.handleHttpRequest(request, response)).catch((error: unknown) => {
+      log(`http handler error: ${(error as Error).message}`);
+      if (!response.headersSent) {
+        response.writeHead(500, { 'Content-Type': 'application/json' });
+      }
+      response.end(JSON.stringify({ error: 'Desktop agent request failed' }));
+    });
+  });
   const wss = new WebSocketServer({
-    port: opts.port,
-    host: opts.host,
+    server,
     path: opts.path,
   });
 
   wss.on('connection', (ws, req) => handleConnection(ws, req, opts, log));
-  wss.on('listening', () =>
+  server.on('listening', () =>
     log(`pty gateway listening on ws://${opts.host ?? '0.0.0.0'}:${opts.port}${opts.path ?? ''}`),
   );
   wss.on('error', (err) => log(`pty gateway error: ${err.message}`));
+  server.on('error', (err) => log(`gateway server error: ${err.message}`));
+  server.listen(opts.port, opts.host);
 
   return {
     port: opts.port,
     close: () =>
       new Promise<void>((resolve) => {
-        wss.close(() => resolve());
+        wss.close(() => {
+          server.close(() => resolve());
+        });
       }),
   };
 }

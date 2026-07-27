@@ -76,6 +76,22 @@ export class GitController {
     return this.git.push(user.userId, projectId);
   }
 
+  @Post('push/start')
+  async startPush(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
+    await this.own(user, projectId);
+    return this.git.startPush(user.userId, projectId);
+  }
+
+  @Get('push/progress')
+  async pushProgress(
+    @CurrentUser() user: AuthUser,
+    @Param('projectId') projectId: string,
+    @Query('operationId') operationId: string,
+  ) {
+    await this.own(user, projectId);
+    return this.git.pushProgress(user.userId, projectId, operationId);
+  }
+
   @Post('pull')
   async pull(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
     await this.own(user, projectId);

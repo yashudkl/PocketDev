@@ -68,6 +68,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
+    const bootstrapTimeout = setTimeout(() => {
+      if (active) setIsBootstrapping(false);
+    }, 8_000);
+
     void (async () => {
       try {
         await hydrateApiUrl();
@@ -91,11 +95,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
       } catch {
         await clearSession();
       } finally {
+        clearTimeout(bootstrapTimeout);
         if (active) setIsBootstrapping(false);
       }
     })();
     return () => {
       active = false;
+      clearTimeout(bootstrapTimeout);
     };
   }, [clearSession]);
 

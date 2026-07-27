@@ -10,7 +10,7 @@ export interface StartSessionResponse {
   jobId: string;
   sessionId: string;
   target: ExecutionTarget;
-  /** Where the PTY WebSocket lives: the cloud worker, or the desktop tunnel. */
+  /** Absolute worker URL or API-relative desktop PTY proxy URL. */
   wsUrl: string;
   /** Short-lived JWT (scope: "pty") authorizing this session on the PTY server. */
   wsToken: string;

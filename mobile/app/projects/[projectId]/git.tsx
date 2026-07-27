@@ -1,3 +1,4 @@
+import type { GitPushProgress } from '@pocketdev/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -23,6 +24,12 @@ function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 }
 
+const PUSH_POLL_INTERVAL_MS = 650;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default function GitScreen() {
   const params = useLocalSearchParams<{ projectId: string }>();
   const projectId = param(params.projectId);
@@ -31,6 +38,8 @@ export default function GitScreen() {
   const [commitVisible, setCommitVisible] = useState(false);
   const [remoteVisible, setRemoteVisible] = useState(false);
   const [diffPath, setDiffPath] = useState<string | undefined>();
+  const [pushProgress, setPushProgress] = useState<GitPushProgress | null>(null);
+  const [pushElapsedSeconds, setPushElapsedSeconds] = useState(0);
 
   const projectQuery = useQuery({
     queryKey: ['projects', projectId],
@@ -40,6 +49,8 @@ export default function GitScreen() {
     queryKey: ['git', projectId, 'status'],
     queryFn: () => gitApi.status(projectId),
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const isRepository = Boolean(statusQuery.data);
   const logQuery = useQuery({
@@ -83,21 +94,50 @@ export default function GitScreen() {
   });
   const remoteMutation = useMutation({
     mutationFn: (url: string) => gitApi.setRemote(projectId, url),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       setRemoteVisible(false);
+      await invalidateGit();
       Toast.show({ type: 'success', text1: 'Origin updated', text2: result.remote });
     },
     onError: (error) =>
       Toast.show({ type: 'error', text1: 'Remote failed', text2: getErrorMessage(error) }),
   });
   const pushMutation = useMutation({
-    mutationFn: () => gitApi.push(projectId),
+    mutationFn: async () => {
+      let progress = await gitApi.startPush(projectId);
+      const startedAt = Date.parse(progress.startedAt);
+      setPushElapsedSeconds(0);
+      setPushProgress(progress);
+      while (progress.status === 'RUNNING') {
+        await wait(PUSH_POLL_INTERVAL_MS);
+        progress = await gitApi.pushProgress(projectId, progress.operationId);
+        setPushElapsedSeconds(Math.max(0, Math.round((Date.now() - startedAt) / 1000)));
+        setPushProgress(progress);
+      }
+      if (progress.status === 'FAILED') {
+        throw new Error(progress.error || progress.message);
+      }
+      return progress;
+    },
     onSuccess: async (result) => {
       await invalidateGit();
       Toast.show({ type: 'success', text1: `Pushed ${result.branch}` });
     },
-    onError: (error) =>
-      Toast.show({ type: 'error', text1: 'Push failed', text2: getErrorMessage(error) }),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      setPushProgress((current) =>
+        current?.status === 'RUNNING'
+          ? {
+              ...current,
+              status: 'FAILED',
+              stage: 'FAILED',
+              message: 'Push progress stopped',
+              error: message,
+            }
+          : current,
+      );
+      Toast.show({ type: 'error', text1: 'Push failed', text2: message });
+    },
   });
   const pullMutation = useMutation({
     mutationFn: () => gitApi.pull(projectId),
@@ -132,7 +172,11 @@ export default function GitScreen() {
           <EmptyState
             icon="git-branch-outline"
             title="Git is not initialized"
-            description="Initialize a repository in the synced project store. Commits will use the local PocketDev identity."
+            description={
+              projectQuery.data?.desktopPath
+                ? 'Initialize Git directly in the selected desktop folder.'
+                : 'Initialize a repository in the synced project store. Commits will use the local PocketDev identity.'
+            }
             actionLabel={initMutation.isPending ? 'Initializing…' : 'Initialize Git'}
             onAction={() => initMutation.mutate()}
           />
@@ -144,6 +188,8 @@ export default function GitScreen() {
   }
 
   const status = statusQuery.data;
+  const pushPercent = Math.max(0, Math.min(100, pushProgress?.percent ?? 0));
+  const pushProgressWidth = `${pushPercent}%` as `${number}%`;
   return (
     <Screen
       scroll
@@ -186,6 +232,16 @@ export default function GitScreen() {
             <AppText variant="caption">Branches</AppText>
             <AppText variant="heading">{branchesQuery.data?.all.length ?? '—'}</AppText>
           </View>
+        </View>
+        <View className="mt-4 border-t border-slate-800 pt-3">
+          <AppText variant="caption">Origin</AppText>
+          <AppText
+            variant="mono"
+            className={`mt-1 text-xs ${status.remoteUrl ? 'text-cyan-300' : 'text-slate-500'}`}
+            numberOfLines={2}
+          >
+            {status.remoteUrl ?? 'Not connected'}
+          </AppText>
         </View>
       </Card>
 
@@ -247,6 +303,46 @@ export default function GitScreen() {
         </Card>
       )}
 
+      {pushProgress ? (
+        <Card className="gap-3 border-cyan-500/30">
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <AppText variant="label">
+                {pushProgress.status === 'COMPLETED'
+                  ? 'Push complete'
+                  : pushProgress.status === 'FAILED'
+                    ? 'Push failed'
+                    : 'Pushing to origin'}
+              </AppText>
+              <AppText className="mt-1 text-sm text-slate-300" numberOfLines={3}>
+                {pushProgress.error ?? pushProgress.message}
+              </AppText>
+            </View>
+            <Badge
+              label={`${pushPercent}%`}
+              tone={
+                pushProgress.status === 'COMPLETED'
+                  ? 'success'
+                  : pushProgress.status === 'FAILED'
+                    ? 'danger'
+                    : 'primary'
+              }
+            />
+          </View>
+          <View className="h-2 overflow-hidden rounded-full bg-slate-800">
+            <View
+              className={`h-full rounded-full ${
+                pushProgress.status === 'FAILED' ? 'bg-red-400' : 'bg-cyan-400'
+              }`}
+              style={{ width: pushProgressWidth }}
+            />
+          </View>
+          <AppText variant="mono" className="text-[11px] text-slate-500">
+            {pushProgress.branch} · {pushProgress.stage.toLowerCase()} · {pushElapsedSeconds}s
+          </AppText>
+        </Card>
+      ) : null}
+
       <View className="flex-row gap-2">
         <Button
           label="Pull"
@@ -254,14 +350,15 @@ export default function GitScreen() {
           variant="secondary"
           className="flex-1"
           loading={pullMutation.isPending}
+          disabled={pushMutation.isPending}
           onPress={() => pullMutation.mutate()}
         />
         <Button
-          label="Push"
+          label={pushMutation.isPending ? `Pushing ${pushPercent}%` : 'Push'}
           icon="arrow-up"
           variant="secondary"
           className="flex-1"
-          loading={pushMutation.isPending}
+          disabled={pushMutation.isPending || pullMutation.isPending}
           onPress={() => pushMutation.mutate()}
         />
       </View>
@@ -280,8 +377,8 @@ export default function GitScreen() {
         onPress={() => setRemoteVisible(true)}
       />
       <AppText variant="caption" className="text-center leading-5">
-        Commit stages every changed file. Push and pull use credentials configured on the PocketDev
-        server.
+        Commit stages every changed file. Push and pull use credentials configured on the{' '}
+        {projectQuery.data?.desktopPath ? 'connected desktop' : 'PocketDev server'}.
       </AppText>
 
       {commitVisible ? (
@@ -302,7 +399,9 @@ export default function GitScreen() {
         <GitTextModal
           visible
           title="Configure origin"
-          description="HTTPS credentials or SSH keys must already be configured on the server."
+          description={`HTTPS credentials or SSH keys must already be configured on the ${
+            projectQuery.data?.desktopPath ? 'connected desktop' : 'PocketDev server'
+          }.`}
           label="Remote URL"
           placeholder="git@github.com:owner/repo.git"
           actionLabel="Save origin"

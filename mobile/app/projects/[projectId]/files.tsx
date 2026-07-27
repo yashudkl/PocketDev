@@ -63,6 +63,8 @@ export default function FilesScreen() {
   const treeQuery = useQuery({
     queryKey: ['files', projectId],
     queryFn: () => filesApi.tree(projectId),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const createMutation = useMutation({

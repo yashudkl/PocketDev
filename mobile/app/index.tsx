@@ -1,10 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Redirect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function Index() {
+  const { isAuthenticated, isBootstrapping } = useAuth();
+
+  if (!isBootstrapping) {
+    return <Redirect href={isAuthenticated ? '/(tabs)/home' : '/(auth)/login'} />;
+  }
+
   return (
     <View className="flex-1 items-center justify-center bg-[#070A0F]">
       <View className="mb-5 h-16 w-16 items-center justify-center rounded-2xl border border-cyan-500/30 bg-cyan-500/10">

@@ -52,7 +52,7 @@ export function TerminalInput({
           blurOnSubmit={false}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder={disabled ? 'Waiting for terminal…' : 'Type terminal input'}
+          placeholder={disabled ? 'Waiting for terminal…' : 'Enter the next command'}
           placeholderTextColor={colors.subtle}
           selectionColor={colors.primary}
           className="h-11 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 font-mono text-sm text-white"

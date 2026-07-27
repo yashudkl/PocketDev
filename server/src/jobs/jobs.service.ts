@@ -56,7 +56,7 @@ export class JobsService {
 
     await this.enforceQuota(userId);
 
-    const route = await this.resolveTarget(userId);
+    const route = await this.resolveTarget(userId, dto.projectId);
 
     const job = await this.prisma.job.create({
       data: {
@@ -114,7 +114,10 @@ export class JobsService {
       jobId: job.id,
       sessionId: session.id,
       target: route.target,
-      wsUrl: route.target === ExecutionTarget.CLOUD ? this.workerWsUrl() : route.tunnelUrl!,
+      wsUrl:
+        route.target === ExecutionTarget.CLOUD
+          ? this.workerWsUrl()
+          : `/desktop/pty?token=${encodeURIComponent(wsToken)}`,
       wsToken,
     };
   }
@@ -132,12 +135,24 @@ export class JobsService {
   /** Desktop-if-present-else-cloud routing (Decision 4). */
   private async resolveTarget(
     userId: string,
+    projectId: string,
   ): Promise<{ target: ExecutionTarget; tunnelUrl?: string }> {
     const presence = await this.prisma.desktopPresence.findUnique({ where: { userId } });
     const windowMs = this.config.get<number>('execution.desktopHeartbeatWindowMs') ?? 30_000;
+    const linkedToProject =
+      (Array.isArray(presence?.linkedProjects) &&
+        presence.linkedProjects.some(
+          (link) =>
+            typeof link === 'object' &&
+            link !== null &&
+            !Array.isArray(link) &&
+            link.projectId === projectId,
+        )) ||
+      presence?.projectId === projectId;
     const fresh =
       !!presence?.online &&
       !!presence.tunnelUrl &&
+      linkedToProject &&
       Date.now() - presence.lastHeartbeat.getTime() < windowMs;
     return fresh
       ? { target: ExecutionTarget.DESKTOP, tunnelUrl: presence!.tunnelUrl! }

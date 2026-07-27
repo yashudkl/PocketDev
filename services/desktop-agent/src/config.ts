@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { homedir, hostname } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { loadSharedEnv } from '@pocketdev/pty-core';
 
@@ -53,6 +54,13 @@ export const config = {
   shell: defaultShell(),
   /** Directory sessions open in — the developer's actual local project. */
   projectRoot: resolve(process.env.DESKTOP_PROJECT_ROOT ?? process.cwd()),
+  /** PocketDev project this agent/root is allowed to execute. */
+  projectId: process.env.POCKETDEV_PROJECT ?? '',
+  /** Durable map of projects linked from the mobile desktop browser. */
+  stateFile: resolve(
+    process.env.DESKTOP_STATE_FILE ?? join(homedir(), '.pocketdev', 'desktop-links.json'),
+  ),
+  deviceName: process.env.DESKTOP_NAME?.trim() || hostname(),
   heartbeatMs: num(process.env.DESKTOP_HEARTBEAT_MS, 15_000),
 } as const;
 
@@ -66,4 +74,31 @@ export function shellArgs(shell: string, command?: string): string[] {
     return cmd ? ['/c', cmd] : [];
   }
   return cmd ? ['-lc', cmd] : ['-l'];
+}
+
+const PNPM_ONLY_NPM_CONFIG = new Set([
+  'npm_config__jsr_registry',
+  'npm_config_auto_install_peers',
+  'npm_config_node_linker',
+  'npm_config_npm_globalconfig',
+  'npm_config_recursive',
+  'npm_config_shared_workspace_lockfile',
+  'npm_config_verify_deps_before_run',
+]);
+
+/** Remove pnpm lifecycle settings that npm treats as unknown user configuration. */
+export function terminalEnvironment(
+  source: NodeJS.ProcessEnv = process.env,
+): Record<string, string | undefined> {
+  const overrides: Record<string, string | undefined> = {
+    NO_COLOR: '1',
+    FORCE_COLOR: undefined,
+    npm_config_color: 'false',
+  };
+  for (const name of Object.keys(source)) {
+    if (PNPM_ONLY_NPM_CONFIG.has(name.toLowerCase())) {
+      overrides[name] = undefined;
+    }
+  }
+  return overrides;
 }

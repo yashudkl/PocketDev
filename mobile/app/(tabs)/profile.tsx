@@ -375,8 +375,8 @@ export default function ProfileScreen() {
           />
           <ProfileSettingRow
             icon="sparkles-outline"
-            title="Local AI assistant"
-            description="Import a GGUF model for private, on-device terminal explanations."
+            title="On-device AI (optional)"
+            description="Use a private local model instead of the automatic server assistant."
             status={{
               label: 'Optional',
               tone: 'neutral',

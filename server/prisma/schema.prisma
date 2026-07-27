@@ -58,20 +58,23 @@ model User {
 }
 
 model Project {
-  id           String    @id @default(cuid())
-  userId       String
-  name         String
-  slug         String
-  description  String?
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  slug            String
+  description     String?
+  desktopPath     String?
+  desktopLinkedAt DateTime?
   // File manifest / sync-delta metadata — JSONB (Decision 1: the ~20% document-shaped part).
-  manifest     Json?
-  lastSyncedAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  manifest        Json?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs     Job[]
-  sessions Session[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs             Job[]
+  sessions         Session[]
+  desktopPresences DesktopPresence[]
 
   @@unique([userId, slug])
   @@index([userId])
@@ -92,8 +95,8 @@ model Job {
   startedAt  DateTime?
   finishedAt DateTime?
 
-  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   session Session?
 
   @@index([projectId])
@@ -123,16 +126,16 @@ model Session {
 }
 
 model Subscription {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  tier           Tier     @default(FREE)
-  status         String   @default("active")
-  quotaJobsPerDay Int     @default(50)
-  jobsUsedToday  Int      @default(0)
-  quotaResetAt   DateTime @default(now())
-  renewsAt       DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  tier            Tier      @default(FREE)
+  status          String    @default("active")
+  quotaJobsPerDay Int       @default(50)
+  jobsUsedToday   Int       @default(0)
+  quotaResetAt    DateTime  @default(now())
+  renewsAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -142,14 +145,20 @@ model Subscription {
 // Local-desktop-as-runtime presence (Decision 4). The desktop agent heartbeats
 // to the API; routing sends execution to the desktop tunnel when online.
 model DesktopPresence {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  online        Boolean  @default(false)
-  tunnelUrl     String?
-  lastHeartbeat DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  projectId      String?
+  projectRoot    String?
+  deviceName     String?
+  linkedProjects Json?
+  online         Boolean  @default(false)
+  tunnelUrl      String?
+  lastHeartbeat  DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  @@index([projectId])
   @@map("desktop_presence")
 }

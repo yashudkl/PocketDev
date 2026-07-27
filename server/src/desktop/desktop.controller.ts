@@ -1,7 +1,9 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { DesktopService } from './desktop.service';
+import { BrowseDesktopDto } from './dto/browse-desktop.dto';
 import { HeartbeatDto } from './dto/heartbeat.dto';
+import { LinkDesktopDto } from './dto/link-desktop.dto';
 
 @Controller('desktop')
 export class DesktopController {
@@ -10,7 +12,7 @@ export class DesktopController {
   @HttpCode(200)
   @Post('heartbeat')
   heartbeat(@CurrentUser() user: AuthUser, @Body() dto: HeartbeatDto) {
-    return this.desktop.heartbeat(user.userId, dto.tunnelUrl);
+    return this.desktop.heartbeat(user.userId, dto);
   }
 
   @HttpCode(200)
@@ -22,5 +24,15 @@ export class DesktopController {
   @Get('status')
   status(@CurrentUser() user: AuthUser) {
     return this.desktop.status(user.userId);
+  }
+
+  @Get('browse')
+  browse(@CurrentUser() user: AuthUser, @Query() query: BrowseDesktopDto) {
+    return this.desktop.browse(user.userId, query.path);
+  }
+
+  @Post('link')
+  link(@CurrentUser() user: AuthUser, @Body() dto: LinkDesktopDto) {
+    return this.desktop.linkProject(user.userId, dto.projectId, dto.path);
   }
 }

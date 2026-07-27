@@ -41,6 +41,28 @@ export interface AppConfig {
     /** Heartbeat freshness window: a desktop is "online" if it beat within this. */
     desktopHeartbeatWindowMs: number;
   };
+  assistant: {
+    apiKey?: string;
+    baseUrl: string;
+    model: string;
+    timeoutMs: number;
+  };
+}
+
+function assistantConfiguration(): AppConfig['assistant'] {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  const usesGroqDefaults = !process.env.AI_API_KEY && !openRouterKey && !!groqKey;
+  return {
+    apiKey: process.env.AI_API_KEY || openRouterKey || groqKey || undefined,
+    baseUrl:
+      process.env.AI_BASE_URL ??
+      (usesGroqDefaults ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1'),
+    model:
+      process.env.AI_MODEL ??
+      (usesGroqDefaults ? 'llama-3.3-70b-versatile' : 'meta-llama/llama-3.3-70b-instruct'),
+    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS ?? '60000', 10),
+  };
 }
 
 export default (): AppConfig => ({
@@ -61,9 +83,7 @@ export default (): AppConfig => ({
   execution: {
     workerWsUrl: process.env.WORKER_WS_URL ?? 'ws://localhost:4100',
     wsTokenTtl: process.env.PTY_TOKEN_TTL ?? '5m',
-    desktopHeartbeatWindowMs: parseInt(
-      process.env.DESKTOP_HEARTBEAT_WINDOW_MS ?? '30000',
-      10,
-    ),
+    desktopHeartbeatWindowMs: parseInt(process.env.DESKTOP_HEARTBEAT_WINDOW_MS ?? '30000', 10),
   },
+  assistant: assistantConfiguration(),
 });

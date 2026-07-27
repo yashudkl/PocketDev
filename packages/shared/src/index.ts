@@ -6,3 +6,4 @@ export * from './exec-events';
 export * from './session-api';
 export * from './git-protocol';
 export * from './files';
+export * from './desktop';

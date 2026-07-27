@@ -10,18 +10,20 @@ Android device.
 - Email registration, login, secure JWT persistence, session restoration, and
   logout
 - Runtime API server selection with a `/health` connection check
-- Project list, creation, workspace summary, refresh, and deletion
+- Project list, blank project creation, connected-desktop drive/folder linking,
+  workspace summary, refresh, and deletion
 - Searchable file tree, file and folder deletion, text-file creation, editing,
   saving, and clipboard copy
-- Real queued terminal jobs over the PocketDev raw WebSocket PTY protocol,
-  including interactive input, live output, cancellation, and cloud/desktop
-  target status
+- Real queued terminal sessions over the PocketDev raw WebSocket PTY protocol,
+  including a persistent interactive shell, visible starting directory, live
+  input/output, cancellation, and cloud/desktop target status
 - Activity dashboard with job filters and live-session polling
 - Git initialization, status, file diffs, commit history, commit-all, origin
-  configuration, push, and pull
+  configuration, push with live Git phase/percentage feedback, and pull
 - Account, demo plan, runner, API, secure-session, and device-biometric status
-- Optional offline explanations for failed commands with a user-imported GGUF
-  model through `llama.rn`
+- On-demand backend AI explanations for successful output, warnings, logs, and
+  failed commands through an OpenAI-compatible provider, with optional private
+  on-device GGUF inference through `llama.rn`
 
 The UI uses Expo Router, NativeWind, TanStack Query, and shared components under
 `components/ui`. API calls are centralized in `api/`, and authentication,
@@ -137,6 +139,13 @@ Its app identity is:
 - iOS bundle identifier: `com.billjeshbaidya.pocketdev`
 - Android application ID: `com.billjeshbaidya.pocketdev`
 
+The optional `llama.rn` extended-address-space and increased-memory iOS
+entitlements are disabled. The automatic server assistant does not need them,
+and disabling them lets development and preview builds use ordinary ad hoc
+provisioning profiles. If local inference later needs those entitlements, enable
+them only after the Apple App ID and provisioning profiles have the matching
+capabilities.
+
 Rebuild the development client after adding, removing, or upgrading a dependency
 with native iOS code, changing an Expo config plugin, or changing native
 entitlements. Normal TypeScript, NativeWind, and component changes can be loaded
@@ -162,20 +171,22 @@ pnpm exec expo export --platform ios --output-dir .tmp-ios-export
 Delete that temporary export directory after inspection. Keep `pnpm-lock.yaml`
 committed so EAS installs the exact dependency graph that passed these checks.
 
-## Local GGUF assistant
+## AI terminal explanations
 
-Open **Settings > Local Assistant**, then choose **Import GGUF model**. PocketDev
-copies the selected model into its application documents directory; the model is
-not bundled in the app and is never uploaded.
+Failed terminal commands use the authenticated backend assistant automatically.
+Configure an OpenAI-compatible provider in `server/.env`; no API key or model
+file is stored in the mobile app:
 
-A small instruct model with Q4_K_M quantization around 1-2 GB is a practical
-starting point on a supported iPhone. Larger models require substantially more
-storage and memory. After a terminal command exits with a non-zero status, use
-**Explain locally** to pass the command, exit code, and recent output to the
-on-device model. The feature works offline after the model has been imported.
+```dotenv
+OPENROUTER_API_KEY=sk-or-v1-...
+AI_MODEL=meta-llama/llama-3.3-70b-instruct
+```
 
-Removing the model from Local Assistant settings deletes PocketDev's copied file,
-not the source file selected from the Files app.
+`llama.rn` remains an optional privacy mode. A user who deliberately opens
+**Settings > On-device AI** can import a GGUF model and run explanations offline.
+PocketDev copies the selected model into its application documents directory and
+never uploads it. Removing the local model deletes PocketDev's copy, not the
+source file selected from the Files app.
 
 ## Current workflow constraints
 

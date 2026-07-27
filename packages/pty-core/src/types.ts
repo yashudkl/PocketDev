@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { PtyTokenClaims } from '@pocketdev/shared';
 
 /** A live pseudo-terminal, abstracted over node-pty so callers stay decoupled. */
@@ -17,7 +18,7 @@ export interface SpawnSpec {
   command: string;
   args: string[];
   cwd?: string;
-  env?: Record<string, string>;
+  env?: Record<string, string | undefined>;
   cols?: number;
   rows?: number;
 }
@@ -52,6 +53,8 @@ export interface PtyGatewayOptions {
   onSessionStart?: (claims: PtyTokenClaims, ctx: StartContext) => void;
   /** Called when the PTY exits (process end, kill, or client disconnect). */
   onSessionExit?: (claims: PtyTokenClaims, ctx: StartContext, exitCode: number) => void;
+  /** Optional HTTP control plane served on the same port as the WebSocket gateway. */
+  handleHttpRequest?: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>;
   logger?: (msg: string) => void;
 }
 

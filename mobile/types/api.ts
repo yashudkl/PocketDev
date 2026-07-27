@@ -33,6 +33,8 @@ export interface Project {
   name: string;
   slug: string;
   description: string | null;
+  desktopPath?: string | null;
+  desktopLinkedAt?: string | null;
   manifest?: Record<string, unknown> | null;
   lastSyncedAt: string | null;
   createdAt: string;
@@ -67,7 +69,14 @@ export interface Session {
 
 export interface DesktopStatus {
   online: boolean;
+  deviceName: string | null;
   tunnelUrl: string | null;
+  projectId: string | null;
+  projectRoot: string | null;
+  projects: {
+    projectId: string;
+    projectRoot: string;
+  }[];
   lastHeartbeat: string | null;
   target: ExecutionTarget;
 }

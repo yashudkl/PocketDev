@@ -1,13 +1,21 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import chokidar from 'chokidar';
 import { Command } from 'commander';
 import { IGNORED_DIRS } from './manifest';
 import { syncOnce } from './sync-client';
 
+const execFileAsync = promisify(execFile);
+
 /** Normalize an http(s)/ws(s) base URL to a ws(s) one for the /sync socket. */
 function toWs(url: string): string {
   return url.replace(/^http/i, 'ws');
+}
+
+function toHttp(url: string): string {
+  return url.replace(/^ws/i, 'http').replace(/\/+$/, '');
 }
 
 interface CommonOpts {
@@ -35,6 +43,32 @@ const log = (msg: string): void => console.log(`[cli-agent] ${msg}`);
 
 const program = new Command();
 program.name('pocketdev').description('PocketDev CLI sync agent').version('0.1.0');
+
+program
+  .command('link')
+  .argument('<dir>', 'existing desktop project directory to link')
+  .option('-p, --project <id>', 'project id on the server')
+  .option('-s, --server <url>', 'server URL (http/ws)', 'ws://localhost:3000')
+  .option('-t, --token <jwt>', 'access token (JWT)')
+  .description('Link a desktop folder, sync its files, and carry across its Git origin')
+  .action(async (dir: string, opts: CommonOpts) => {
+    const { projectId, token, server } = resolveAuth(opts);
+    const root = resolve(dir);
+    log(`linking ${root} → ${server} (project ${projectId})`);
+    try {
+      const res = await syncOnce({ server, token, projectId, root, log });
+      await linkDesktopProject({ server, token, projectId, root });
+      const remote = await localGitOrigin(root);
+      await configureServerGit({ server, token, projectId, remote });
+      log(
+        `linked: ${res.changed} sent, ${res.removed} removed` +
+          (remote ? `, origin=${remote}` : ', no local Git origin detected'),
+      );
+    } catch (err) {
+      console.error(`[cli-agent] link failed: ${(err as Error).message}`);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command('sync')
@@ -135,3 +169,57 @@ program.parseAsync(process.argv).catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+async function apiPost(
+  server: string,
+  token: string,
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<unknown> {
+  const response = await fetch(`${toHttp(server)}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    throw new Error(`${path} returned ${response.status}: ${await response.text()}`);
+  }
+  return response.json();
+}
+
+async function linkDesktopProject(input: {
+  server: string;
+  token: string;
+  projectId: string;
+  root: string;
+}): Promise<void> {
+  await apiPost(input.server, input.token, `/projects/${input.projectId}/link`, {
+    desktopPath: input.root,
+  });
+}
+
+async function localGitOrigin(root: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', ['-C', root, 'remote', 'get-url', 'origin']);
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function configureServerGit(input: {
+  server: string;
+  token: string;
+  projectId: string;
+  remote: string | null;
+}): Promise<void> {
+  await apiPost(input.server, input.token, `/projects/${input.projectId}/git/init`);
+  if (input.remote) {
+    await apiPost(input.server, input.token, `/projects/${input.projectId}/git/remote`, {
+      url: input.remote,
+    });
+  }
+}

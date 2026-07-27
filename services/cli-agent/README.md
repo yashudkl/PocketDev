@@ -13,3 +13,15 @@ then pushes only changed files — after that, the PC can be off (Project Brief 
 ```bash
 pnpm --filter @pocketdev/cli-agent dev -- watch ./my-project --project <projectId>
 ```
+
+To link an existing folder to a project that was created in the mobile app, run:
+
+```bash
+POCKETDEV_TOKEN=<jwt> pnpm --filter @pocketdev/cli-agent exec tsx src/index.ts \
+  link C:/path/to/project --project <projectId> --server http://localhost:3000
+```
+
+`link` performs the first file sync, records the absolute desktop path on the
+project, initializes Git in the synced server workspace, and copies the local
+repository's `origin` URL when one exists. Continue syncing changes with
+`watch`. The `.git` object database itself is deliberately not uploaded.

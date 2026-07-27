@@ -3,6 +3,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import { initLlama, type LlamaContext } from 'llama.rn';
 
+import { plainTerminalText } from '@/utils/terminal';
+
 const MODEL_KEY = 'pocketdev.local-model.v1';
 const modelDirectory = new Directory(Paths.document, 'models');
 
@@ -15,12 +17,6 @@ export interface LocalModel {
 let activeContext: LlamaContext | null = null;
 let activeModelUri: string | null = null;
 let releasePromise: Promise<void> | null = null;
-
-const escapeCharacter = String.fromCharCode(27);
-const ansiPattern = new RegExp(
-  `${escapeCharacter}(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\u0007]*(?:\\u0007|${escapeCharacter}\\\\))`,
-  'g',
-);
 
 export async function getLocalModel(): Promise<LocalModel | null> {
   const raw = await AsyncStorage.getItem(MODEL_KEY);
@@ -122,7 +118,7 @@ export async function explainTerminalFailure({
 }: {
   command: string;
   output: string;
-  exitCode: number;
+  exitCode?: number;
   onToken?: (text: string) => void;
 }): Promise<string> {
   const model = await getLocalModel();
@@ -130,21 +126,20 @@ export async function explainTerminalFailure({
     throw new Error('Import a GGUF model in Local Assistant settings first.');
   }
   const context = await contextForModel(model);
-  const tail = output
-    .replace(ansiPattern, '')
-    .replace(/\r(?!\n)/g, '')
-    .slice(-8_000);
+  const tail = plainTerminalText(output).slice(-8_000);
   const result = await context.completion(
     {
       messages: [
         {
           role: 'system',
           content:
-            'You are PocketDev, a concise offline debugging assistant. Explain the likely cause, then give specific steps to fix it. Never invent output that is not present.',
+            'You are PocketDev, a concise offline terminal assistant. Explain what the output means. If it failed, identify the likely cause and give specific fixes. If it succeeded, summarize it and call out useful warnings or next steps. Never invent output that is not present.',
         },
         {
           role: 'user',
-          content: `Command: ${command}\nExit code: ${exitCode}\nTerminal output:\n${tail}`,
+          content: `Command: ${command}\nExit code: ${
+            exitCode === undefined ? 'not available' : exitCode
+          }\nTerminal output:\n${tail}`,
         },
       ],
       n_predict: 320,
